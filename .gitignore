@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# Node
+node_modules/
+frontend/dist/
+.vite/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment
+.env
+backend/.env
+
+# Docker
+.docker/
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+
+# OS
+.DS_Store

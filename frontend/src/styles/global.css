@@ -1,0 +1,73 @@
+/*
+ * Global styles for Vision-First Study Buddy.
+ *
+ * MUI handles most styling through the ThemeProvider.
+ * This file contains minimal global resets and CSS variables.
+ *
+ * TODO: Add global styles once MUI theme is implemented:
+ * - CSS variables for custom colors
+ * - Font imports (Google Fonts Roboto)
+ * - Smooth scrolling
+ * - Selection color
+ * - Print styles for study guides
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Print styles for study guide export */
+@media print {
+  /* Hide navigation and interactive elements */
+  header,
+  nav,
+  .MuiAppBar-root,
+  .MuiDrawer-root,
+  button,
+  .MuiFab-root {
+    display: none !important;
+  }
+
+  /* Expand all accordions */
+  .MuiAccordion-root {
+    box-shadow: none !important;
+    border: 1px solid #ddd;
+    margin-bottom: 8px;
+  }
+
+  .MuiAccordionDetails-root {
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+  }
+
+  .MuiCollapse-root {
+    height: auto !important;
+    visibility: visible !important;
+    display: block !important;
+  }
+
+  .MuiAccordionSummary-expandIconWrapper {
+    display: none !important;
+  }
+
+  /* Clean layout */
+  .study-guide-print {
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  body {
+    font-size: 12pt;
+    color: #000;
+    background: #fff;
+  }
+}
