@@ -1,9 +1,12 @@
 """Upload router -- handles file uploads to Firebase Storage."""
 
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+logger = logging.getLogger(__name__)
 
 from app.dependencies import get_material_processor, get_storage_client
 from app.models.responses import ErrorBody, ErrorDetail, ErrorResponse, MaterialResponse, UploadResponse
@@ -88,8 +91,10 @@ async def upload_materials(
             for path in uploaded_paths:
                 try:
                     await storage.delete_file(path)
-                except Exception:
-                    pass  # cleanup failure is logged but must not mask the original error
+                except Exception as cleanup_exc:
+                    logger.warning(
+                        "Failed to clean up blob '%s' after upload error: %s", path, cleanup_exc
+                    )
 
             raise HTTPException(
                 status_code=500,
