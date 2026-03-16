@@ -1,5 +1,7 @@
 """Gemini API client -- wraps Vertex AI SDK for multimodal generation."""
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import json
@@ -26,7 +28,7 @@ class GeminiClient:
     """Client for Vertex AI Gemini 1.5 Flash multimodal generation.
 
     Handles SDK initialization, multimodal content assembly, and
-    structured output enforcement via response_schema.
+    structured output enforcement via response_mime_type.
     """
 
     def __init__(self, project_id: str, region: str, model_name: str):
@@ -123,9 +125,36 @@ class GeminiClient:
 
         Returns:
             Dict with 'is_correct' (bool) and 'explanation' (str).
+
+        Raises:
+            GenerationError: If the API call fails.
+            ModelUnavailableError: If the Gemini service is temporarily unavailable.
         """
-        # TODO: Implement semantic grading
-        # 1. Build a prompt asking Gemini to compare the two answers
-        # 2. Request structured JSON output with is_correct and explanation
-        # 3. Parse and return the response
-        raise NotImplementedError
+        prompt = (
+            "You are a grading assistant. Compare the student's answer to the correct answer "
+            "and determine whether the student's answer is semantically correct.\n\n"
+            f"Correct answer: {correct_answer}\n"
+            f"Student answer: {student_answer}\n\n"
+            'Respond with JSON: {"is_correct": boolean, "explanation": "brief explanation of why correct or incorrect"}'
+        )
+        try:
+            model = GenerativeModel(self.model_name)
+            config = GenerationConfig(response_mime_type="application/json")
+
+            def _call() -> str:
+                return model.generate_content(prompt, generation_config=config).text
+
+            text = await asyncio.to_thread(_call)
+            result = json.loads(text)
+            return {
+                "is_correct": bool(result.get("is_correct", False)),
+                "explanation": result.get("explanation", ""),
+            }
+        except google_exceptions.ServiceUnavailable as exc:
+            raise ModelUnavailableError(
+                f"Gemini model '{self.model_name}' is temporarily unavailable: {exc}"
+            ) from exc
+        except json.JSONDecodeError as exc:
+            raise GenerationError(f"Gemini returned invalid JSON during grading: {exc}") from exc
+        except Exception as exc:
+            raise GenerationError(f"Short answer grading failed: {exc}") from exc
