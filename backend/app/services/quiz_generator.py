@@ -5,6 +5,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from app.models.requests import Difficulty, QuestionType
 from app.models.responses import (
     GenerationMetadata,
@@ -15,7 +17,7 @@ from app.models.responses import (
     QuestionResult,
     QuizSubmissionResponse,
 )
-from app.services.gemini_client import GeminiClient
+from app.services.gemini_client import GeminiClient, GenerationError
 from app.services.material_processor import MaterialProcessor
 from app.services.storage_client import StorageClient
 
@@ -88,28 +90,31 @@ class QuizGenerator:
         quiz_id = f"qz_{uuid.uuid4().hex[:8]}"
         now = datetime.now(timezone.utc)
 
-        questions = [
-            QuizQuestion(
-                id=q["id"],
-                type=QuestionType(q["type"]),
-                difficulty=Difficulty(
-                    q.get("difficulty", difficulty if difficulty != "mixed" else "medium")
-                ),
-                question=q["question"],
-                options=q.get("options", []),
-                correct_answer=q["correct_answer"],
-                explanation=q["explanation"],
-            )
-            for q in raw["questions"]
-        ]
+        try:
+            questions = [
+                QuizQuestion(
+                    id=q["id"],
+                    type=QuestionType(q["type"]),
+                    difficulty=Difficulty(
+                        q.get("difficulty", difficulty if difficulty != "mixed" else "medium")
+                    ),
+                    question=q["question"],
+                    options=q.get("options", []),
+                    correct_answer=q["correct_answer"],
+                    explanation=q["explanation"],
+                )
+                for q in raw["questions"]
+            ]
 
-        quiz = Quiz(
-            id=quiz_id,
-            title=raw["title"],
-            questions=questions,
-            source_materials=material_ids,
-            generated_at=now,
-        )
+            quiz = Quiz(
+                id=quiz_id,
+                title=raw["title"],
+                questions=questions,
+                source_materials=material_ids,
+                generated_at=now,
+            )
+        except (KeyError, ValueError, ValidationError) as e:
+            raise GenerationError(f"Failed to parse Gemini quiz response: {e}") from e
 
         elapsed_ms = int((time.monotonic() - start_time) * 1000)
         metadata = GenerationMetadata(

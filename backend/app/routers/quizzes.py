@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies import get_quiz_generator
 from app.models.requests import GenerateQuizRequest, SubmitQuizRequest
 from app.models.responses import Quiz, QuizResponse, QuizSubmissionResponse
-from app.services.gemini_client import GenerationError
+from app.services.gemini_client import GenerationError, ModelUnavailableError
 from app.services.quiz_generator import QuizGenerator
 
 router = APIRouter()
@@ -50,16 +50,15 @@ async def generate_quiz(
             status_code=400,
             detail={"code": "VALIDATION_ERROR", "message": str(e)},
         )
+    except ModelUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MODEL_UNAVAILABLE", "message": "Gemini model is currently unavailable."},
+        )
     except GenerationError as e:
-        msg = str(e)
-        if "503" in msg or "unavailable" in msg.lower():
-            raise HTTPException(
-                status_code=503,
-                detail={"code": "MODEL_UNAVAILABLE", "message": "Gemini model is currently unavailable."},
-            )
         raise HTTPException(
             status_code=500,
-            detail={"code": "GENERATION_FAILED", "message": msg},
+            detail={"code": "GENERATION_FAILED", "message": str(e)},
         )
 
     _quizzes[result.quiz.id] = result

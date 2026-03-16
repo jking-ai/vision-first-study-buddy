@@ -1,5 +1,7 @@
 """Shared FastAPI dependency factories."""
 
+import functools
+
 from fastapi import Depends
 
 from app.config import Settings, get_settings
@@ -20,13 +22,19 @@ def get_material_processor(settings: Settings = Depends(get_settings)) -> Materi
     return MaterialProcessor(settings)
 
 
+@functools.lru_cache(maxsize=4)
+def _cached_gemini_client(project_id: str, region: str, model_name: str) -> GeminiClient:
+    """Create a GeminiClient and cache it by (project_id, region, model_name).
+
+    vertexai.init() is only called once per unique configuration, not per request.
+    Cache size of 4 accommodates test environments that use different settings.
+    """
+    return GeminiClient(project_id, region, model_name)
+
+
 def get_gemini_client(settings: Settings = Depends(get_settings)) -> GeminiClient:
-    """Return a GeminiClient configured for the current GCP project."""
-    return GeminiClient(
-        project_id=settings.gcp_project_id,
-        region=settings.gcp_region,
-        model_name=settings.gemini_model,
-    )
+    """Return a cached GeminiClient configured for the current project and model."""
+    return _cached_gemini_client(settings.gcp_project_id, settings.gcp_region, settings.gemini_model)
 
 
 def get_study_guide_generator(

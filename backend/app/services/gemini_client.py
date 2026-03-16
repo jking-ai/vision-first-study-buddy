@@ -18,8 +18,8 @@ class GenerationError(Exception):
     pass
 
 
-class ModelUnavailableError(Exception):
-    """Raised when the Gemini model is temporarily unavailable (503)."""
+class ModelUnavailableError(GenerationError):
+    """Raised when the Gemini model is temporarily unavailable (e.g., HTTP 503)."""
 
     pass
 
@@ -67,8 +67,8 @@ class GeminiClient:
             Parsed JSON dict from Gemini.
 
         Raises:
+            ModelUnavailableError: If the Gemini model is temporarily unavailable.
             GenerationError: If the API call fails or response cannot be parsed.
-            ModelUnavailableError: If the Gemini service is temporarily unavailable.
         """
         parts = []
         for item in content_parts:
@@ -111,6 +111,8 @@ class GeminiClient:
             raise GenerationError(
                 f"Gemini returned non-JSON output: {exc}"
             ) from exc
+        except (GenerationError, ModelUnavailableError):
+            raise
         except Exception as exc:
             raise GenerationError(
                 f"Gemini generation failed: {exc}"
@@ -127,8 +129,8 @@ class GeminiClient:
             Dict with 'is_correct' (bool) and 'explanation' (str).
 
         Raises:
+            ModelUnavailableError: If the Gemini model is temporarily unavailable.
             GenerationError: If the API call fails.
-            ModelUnavailableError: If the Gemini service is temporarily unavailable.
         """
         prompt = (
             "You are a grading assistant. Compare the student's answer to the correct answer "
@@ -156,5 +158,7 @@ class GeminiClient:
             ) from exc
         except json.JSONDecodeError as exc:
             raise GenerationError(f"Gemini returned invalid JSON during grading: {exc}") from exc
+        except (GenerationError, ModelUnavailableError):
+            raise
         except Exception as exc:
             raise GenerationError(f"Short answer grading failed: {exc}") from exc

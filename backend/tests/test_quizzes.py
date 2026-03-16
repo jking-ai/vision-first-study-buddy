@@ -19,7 +19,7 @@ from app.models.responses import (
     QuestionResult,
     QuizSubmissionResponse,
 )
-from app.services.gemini_client import GenerationError
+from app.services.gemini_client import GenerationError, ModelUnavailableError
 from app.services.quiz_generator import QuizGenerator
 
 # ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ async def test_generate_quiz_returns_500_on_generation_error():
 @pytest.mark.asyncio
 async def test_generate_quiz_returns_503_when_model_unavailable():
     mock = make_quiz_generator_mock()
-    mock.generate = AsyncMock(side_effect=GenerationError("503 model unavailable"))
+    mock.generate = AsyncMock(side_effect=ModelUnavailableError("Gemini model is unavailable"))
     apply_quiz_generator_override(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -290,6 +290,27 @@ async def test_generate_quiz_validates_num_questions_minimum():
             json={"material_ids": ["mat_001"], "num_questions": 2},
         )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_generate_quiz_returns_500_when_gemini_response_malformed():
+    """A GenerationError from bad Gemini JSON (parse failure) should be a 500, not 400."""
+    mock = make_quiz_generator_mock()
+    mock.generate = AsyncMock(
+        side_effect=GenerationError("Failed to parse Gemini quiz response: 'questions'")
+    )
+    apply_quiz_generator_override(mock)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(GENERATE_URL, json={"material_ids": ["mat_001"]})
+
+    assert response.status_code == 500
+    assert response.json()["detail"]["code"] == "GENERATION_FAILED"
+
+
+def test_model_unavailable_error_is_subclass_of_generation_error():
+    err = ModelUnavailableError("unavailable")
+    assert isinstance(err, GenerationError)
 
 
 @pytest.mark.asyncio
