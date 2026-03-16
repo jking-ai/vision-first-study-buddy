@@ -22,14 +22,30 @@ You are an expert study guide creator. Analyze the provided study materials (whi
 
 ## Output Format
 
-Respond with a JSON object containing:
-- "title": A descriptive title for the study guide
-- "summary": A 2-3 sentence overview of the material
-- "sections": An array of sections, each with:
-  - "heading": Section heading
-  - "content": Section content in clear, readable prose
-  - "key_terms": Array of objects with "term" and "definition" fields
+You MUST respond with a valid JSON object and nothing else. Do not include markdown, code fences, or any text outside the JSON. The JSON must match this exact schema:
 
-TODO: Refine this template based on testing with real student materials.
-TODO: Add examples of expected output quality for each detail level.
-TODO: Add handling for materials with diagrams and visual content.
+```
+{{
+  "title": "<A descriptive title for the study guide>",
+  "summary": "<A 2-3 sentence overview of the material>",
+  "sections": [
+    {{
+      "heading": "<Section heading>",
+      "content": "<Section content in clear, readable prose>",
+      "key_terms": [
+        {{
+          "term": "<Key term or concept>",
+          "definition": "<Clear, concise definition>"
+        }}
+      ]
+    }}
+  ]
+}}
+```
+
+Requirements:
+- "title": A descriptive, specific title (not generic like "Study Guide")
+- "summary": Exactly 2-3 sentences capturing the main themes
+- "sections": At least 2 sections, each covering a distinct topic or concept area
+- "key_terms": Each section must have at least 1 key term; include all important vocabulary and concepts
+- All fields are required; "key_terms" may be an empty array only if a section has no domain-specific vocabulary

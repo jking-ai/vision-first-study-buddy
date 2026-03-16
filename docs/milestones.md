@@ -66,15 +66,15 @@
 #### 2.2 Study Guide Generation
 
 **Acceptance criteria:**
-- [ ] `app/prompts/study_guide_template.txt` contains a system instruction template that directs Gemini to: (a) analyze all provided materials including images and documents, (b) extract key concepts, definitions, and relationships, (c) organize content into logical sections, (d) identify and define key terms
-- [ ] `app/services/study_guide_generator.py` orchestrates: fetching materials from storage, building multimodal content parts, calling Gemini, parsing the structured response
-- [ ] `POST /api/v1/study-guides/generate` accepts a list of material IDs and optional focus topics
-- [ ] The endpoint fetches files from Firebase Storage and includes them as multimodal content parts (image bytes for images, PDF bytes for PDFs)
-- [ ] The `detail_level` parameter controls the depth of the generated guide (brief: 1-2 pages, standard: 3-5 pages, detailed: 5+ pages)
-- [ ] Returns a structured `StudyGuideResponse` with title, summary, sections (each with heading, content, key terms), and metadata
-- [ ] `GET /api/v1/study-guides/{id}` retrieves a previously generated study guide from in-memory storage
-- [ ] `metadata.generation_time_ms` accurately reflects the Gemini API call duration
-- [ ] On Gemini failure, returns 500 with `GENERATION_FAILED` error code
+- [x] `app/prompts/study_guide_template.txt` contains a system instruction template that directs Gemini to: (a) analyze all provided materials including images and documents, (b) extract key concepts, definitions, and relationships, (c) organize content into logical sections, (d) identify and define key terms
+- [x] `app/services/study_guide_generator.py` orchestrates: fetching materials from storage, building multimodal content parts, calling Gemini, parsing the structured response
+- [x] `POST /api/v1/study-guides/generate` accepts a list of material IDs and optional focus topics
+- [x] The endpoint fetches files from Firebase Storage and includes them as multimodal content parts (image bytes for images, PDF bytes for PDFs)
+- [x] The `detail_level` parameter controls the depth of the generated guide (brief: 1-2 pages, standard: 3-5 pages, detailed: 5+ pages)
+- [x] Returns a structured `StudyGuideResponse` with title, summary, sections (each with heading, content, key terms), and metadata
+- [x] `GET /api/v1/study-guides/{id}` retrieves a previously generated study guide from in-memory storage
+- [x] `metadata.generation_time_ms` accurately reflects the Gemini API call duration
+- [x] On Gemini failure, returns 500 with `GENERATION_FAILED` error code
 
 #### 2.3 Quiz Generation
 

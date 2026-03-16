@@ -1,20 +1,33 @@
 """Study guides router -- generate and retrieve study guides."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 
-# TODO: Import services and models once implemented
-# from app.services.study_guide_generator import StudyGuideGenerator
-# from app.models.requests import GenerateStudyGuideRequest
-# from app.models.responses import StudyGuideResponse
+from app.dependencies import get_study_guide_generator
+from app.models.requests import GenerateStudyGuideRequest
+from app.models.responses import ErrorBody, ErrorResponse, StudyGuide, StudyGuideResponse
+from app.services.gemini_client import GenerationError, ModelUnavailableError
+from app.services.study_guide_generator import MaterialNotFoundError, StudyGuideGenerator
 
 router = APIRouter()
 
-# TODO: In-memory storage for generated study guides
-# _study_guides: dict[str, dict] = {}
+# In-memory storage for generated study guides (keyed by sg_-prefixed ID)
+_study_guides: dict[str, StudyGuide] = {}
 
 
-@router.post("/study-guides/generate")
-async def generate_study_guide():
+@router.post(
+    "/study-guides/generate",
+    response_model=StudyGuideResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
+async def generate_study_guide(
+    request: GenerateStudyGuideRequest,
+    generator: StudyGuideGenerator = Depends(get_study_guide_generator),
+) -> StudyGuideResponse:
     """Generate a study guide from one or more uploaded materials.
 
     Fetches the specified materials from Firebase Storage, sends them
@@ -24,28 +37,49 @@ async def generate_study_guide():
     Args:
         request: GenerateStudyGuideRequest with material IDs, optional focus topics,
                  and detail level.
+        generator: StudyGuideGenerator (injected).
 
     Returns:
         StudyGuideResponse with the generated study guide and metadata.
 
     Raises:
-        HTTPException 400: If no material IDs are provided.
-        HTTPException 404: If any material ID does not exist.
-        HTTPException 500: If Gemini generation fails.
+        HTTPException 400: If no material IDs are provided (enforced by Pydantic).
+        HTTPException 404: If any material ID does not exist in storage.
+        HTTPException 500: If Gemini generation fails or returns unparseable output.
+        HTTPException 503: If the Gemini model is temporarily unavailable.
     """
-    # TODO: Implement study guide generation
-    # 1. Validate request (at least one material_id)
-    # 2. Fetch materials from Firebase Storage
-    # 3. Build multimodal prompt with images/PDFs + study guide template
-    # 4. Call Gemini with structured output schema
-    # 5. Parse response into StudyGuide model
-    # 6. Store in in-memory dict with generated ID (sg_ + uuid4)
-    # 7. Return StudyGuideResponse with metadata
-    raise NotImplementedError("Study guide generation not yet implemented")
+    try:
+        result = await generator.generate(
+            material_ids=request.material_ids,
+            focus_topics=request.focus_topics,
+            detail_level=request.detail_level,
+        )
+    except MaterialNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorBody(code="MATERIAL_NOT_FOUND", message=str(exc)).model_dump(),
+        )
+    except ModelUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=ErrorBody(code="MODEL_UNAVAILABLE", message=str(exc)).model_dump(),
+        )
+    except GenerationError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorBody(code="GENERATION_FAILED", message=str(exc)).model_dump(),
+        )
+
+    _study_guides[result.study_guide.id] = result.study_guide
+    return result
 
 
-@router.get("/study-guides/{study_guide_id}")
-async def get_study_guide(study_guide_id: str):
+@router.get(
+    "/study-guides/{study_guide_id}",
+    response_model=StudyGuide,
+    responses={404: {"model": ErrorResponse}},
+)
+async def get_study_guide(study_guide_id: str) -> StudyGuide:
     """Retrieve a previously generated study guide by ID.
 
     Args:
@@ -57,5 +91,13 @@ async def get_study_guide(study_guide_id: str):
     Raises:
         HTTPException 404: If the study guide ID does not exist.
     """
-    # TODO: Implement study guide retrieval from in-memory storage
-    raise NotImplementedError("Get study guide endpoint not yet implemented")
+    guide = _study_guides.get(study_guide_id)
+    if guide is None:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorBody(
+                code="STUDY_GUIDE_NOT_FOUND",
+                message=f"No study guide found with ID '{study_guide_id}'.",
+            ).model_dump(),
+        )
+    return guide
