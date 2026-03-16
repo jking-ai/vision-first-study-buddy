@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.config import Settings, get_settings
+from app.dependencies import get_storage_client
 from app.models.responses import (
     ErrorBody,
     ErrorResponse,
@@ -13,10 +13,6 @@ from app.models.responses import (
 from app.services.storage_client import StorageClient, StorageError
 
 router = APIRouter()
-
-
-def get_storage_client(settings: Settings = Depends(get_settings)) -> StorageClient:
-    return StorageClient(settings.firebase_storage_bucket)
 
 
 @router.get(

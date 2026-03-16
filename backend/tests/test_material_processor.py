@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.material_processor import MaterialProcessor, SUPPORTED_MIME_TYPES
+from app.services.material_processor import FileValidationError, MaterialProcessor, SUPPORTED_MIME_TYPES
 
 
 def make_settings(max_file_size_mb: int = 20):
@@ -50,8 +50,9 @@ def test_validate_file_accepts_epub():
 
 def test_validate_file_rejects_unsupported_mime_type():
     processor = make_processor()
-    with pytest.raises(ValueError, match="UNSUPPORTED_FILE_TYPE"):
+    with pytest.raises(FileValidationError) as exc_info:
         processor.validate_file("archive.zip", "application/zip", 1024)
+    assert exc_info.value.code == "UNSUPPORTED_FILE_TYPE"
 
 
 def test_validate_file_rejects_exactly_at_limit():
@@ -64,20 +65,23 @@ def test_validate_file_rejects_exactly_at_limit():
 def test_validate_file_rejects_file_over_limit():
     processor = make_processor(max_file_size_mb=20)
     over_limit = 20 * 1024 * 1024 + 1
-    with pytest.raises(ValueError, match="FILE_TOO_LARGE"):
+    with pytest.raises(FileValidationError) as exc_info:
         processor.validate_file("huge.pdf", "application/pdf", over_limit)
+    assert exc_info.value.code == "FILE_TOO_LARGE"
 
 
 def test_validate_file_error_message_includes_content_type():
     processor = make_processor()
-    with pytest.raises(ValueError, match="application/zip"):
+    with pytest.raises(FileValidationError) as exc_info:
         processor.validate_file("bad.zip", "application/zip", 100)
+    assert "application/zip" in exc_info.value.message
 
 
 def test_validate_file_error_message_includes_filename():
     processor = make_processor(max_file_size_mb=1)
-    with pytest.raises(ValueError, match="bigfile.pdf"):
+    with pytest.raises(FileValidationError) as exc_info:
         processor.validate_file("bigfile.pdf", "application/pdf", 2 * 1024 * 1024)
+    assert "bigfile.pdf" in exc_info.value.message
 
 
 # ---------------------------------------------------------------------------
@@ -161,10 +165,11 @@ def test_prepare_for_gemini_epub_returns_text_part():
     assert result["text"] == extracted
 
 
-def test_prepare_for_gemini_unsupported_type_raises_value_error():
+def test_prepare_for_gemini_unsupported_type_raises_validation_error():
     processor = make_processor()
-    with pytest.raises(ValueError, match="UNSUPPORTED_FILE_TYPE"):
+    with pytest.raises(FileValidationError) as exc_info:
         processor.prepare_for_gemini(b"data", "application/zip")
+    assert exc_info.value.code == "UNSUPPORTED_FILE_TYPE"
 
 
 # ---------------------------------------------------------------------------

@@ -5,20 +5,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from app.config import Settings, get_settings
+from app.dependencies import get_material_processor, get_storage_client
 from app.models.responses import ErrorBody, ErrorDetail, ErrorResponse, MaterialResponse, UploadResponse
-from app.services.material_processor import MaterialProcessor
+from app.services.material_processor import FileValidationError, MaterialProcessor
 from app.services.storage_client import StorageClient, StorageError
 
 router = APIRouter()
-
-
-def get_storage_client(settings: Settings = Depends(get_settings)) -> StorageClient:
-    return StorageClient(settings.firebase_storage_bucket)
-
-
-def get_material_processor(settings: Settings = Depends(get_settings)) -> MaterialProcessor:
-    return MaterialProcessor(settings)
 
 
 @router.post(
@@ -40,6 +32,10 @@ async def upload_materials(
     Accepts multipart file uploads. Each file is validated for type and size,
     then uploaded to Firebase Storage under a unique material ID.
 
+    If a file fails validation, the request is rejected immediately with 400.
+    If a storage upload fails mid-batch, already-uploaded blobs are cleaned up
+    and the endpoint returns 500.
+
     Args:
         files: List of uploaded files.
         storage: Firebase Storage client (injected).
@@ -49,10 +45,12 @@ async def upload_materials(
         UploadResponse with material IDs and metadata for each uploaded file.
 
     Raises:
-        HTTPException 400: If file type is unsupported or file exceeds size limit.
-        HTTPException 500: If Firebase Storage upload fails.
+        HTTPException 400: If any file type is unsupported or exceeds the size limit.
+        HTTPException 500: If a Firebase Storage upload fails (cleanup attempted).
     """
-    uploaded: list[MaterialResponse] = []
+    # Phase 1: read and validate all files before touching Storage.
+    # This lets us return a clean 400 without any partial writes.
+    validated: list[tuple[str, str, int, bytes, str]] = []  # (material_id, filename, size, data, content_type)
 
     for file in files:
         file_data = await file.read()
@@ -60,33 +58,39 @@ async def upload_materials(
         size_bytes = len(file_data)
         filename = file.filename or "upload"
 
-        # Validate
         try:
             processor.validate_file(filename, content_type, size_bytes)
-        except ValueError as exc:
-            msg = str(exc)
-            if msg.startswith("UNSUPPORTED_FILE_TYPE"):
-                error_body = ErrorBody(
-                    code="UNSUPPORTED_FILE_TYPE",
-                    message=msg[len("UNSUPPORTED_FILE_TYPE: "):],
+        except FileValidationError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=ErrorBody(
+                    code=exc.code,
+                    message=exc.message,
                     details=[ErrorDetail(filename=filename, content_type=content_type)],
-                )
-            else:
-                error_body = ErrorBody(
-                    code="FILE_TOO_LARGE",
-                    message=msg[len("FILE_TOO_LARGE: "):],
-                    details=[ErrorDetail(filename=filename)],
-                )
-            raise HTTPException(status_code=400, detail=error_body.model_dump())
+                ).model_dump(),
+            )
 
-        # Generate material ID and upload
         material_id = f"mat_{uuid4().hex[:8]}"
+        validated.append((material_id, filename, size_bytes, file_data, content_type))
+
+    # Phase 2: upload to Firebase Storage. On failure, delete already-uploaded blobs.
+    uploaded: list[MaterialResponse] = []
+    uploaded_paths: list[str] = []
+
+    for material_id, filename, size_bytes, file_data, content_type in validated:
         destination_path = f"materials/{material_id}/{filename}"
         uploaded_at = datetime.now(timezone.utc)
 
         try:
             storage_url = await storage.upload_file(file_data, destination_path, content_type)
         except StorageError as exc:
+            # Best-effort cleanup of blobs written so far.
+            for path in uploaded_paths:
+                try:
+                    await storage.delete_file(path)
+                except Exception:
+                    pass  # cleanup failure is logged but must not mask the original error
+
             raise HTTPException(
                 status_code=500,
                 detail=ErrorBody(
@@ -95,6 +99,7 @@ async def upload_materials(
                 ).model_dump(),
             )
 
+        uploaded_paths.append(destination_path)
         uploaded.append(
             MaterialResponse(
                 id=material_id,

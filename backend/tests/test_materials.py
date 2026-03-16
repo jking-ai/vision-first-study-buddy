@@ -6,19 +6,26 @@ from unittest.mock import AsyncMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_storage_client
 from app.main import app
-from app.routers.materials import get_storage_client
 from app.services.storage_client import StorageClient, StorageError
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Fixtures
 # ---------------------------------------------------------------------------
 
 LIST_URL = "/api/v1/materials"
 DETAIL_URL = "/api/v1/materials/{material_id}"
 
 FIXED_DT = datetime(2026, 2, 27, 10, 30, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def clear_dep_overrides():
+    """Ensure dependency overrides are cleaned up after every test."""
+    yield
+    app.dependency_overrides.clear()
 
 
 def make_blob(
@@ -38,8 +45,8 @@ def make_blob(
     }
 
 
-def override_storage(mock_storage):
-    app.dependency_overrides[get_storage_client] = lambda: mock_storage
+def apply_storage(mock: AsyncMock):
+    app.dependency_overrides[get_storage_client] = lambda: mock
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +59,7 @@ async def test_list_materials_returns_200():
     mock = AsyncMock(spec=StorageClient)
     mock.bucket_name = "test-bucket"
     mock.list_materials.return_value = []
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(LIST_URL)
@@ -69,7 +76,7 @@ async def test_list_materials_returns_all_blobs():
     mock = AsyncMock(spec=StorageClient)
     mock.bucket_name = "test-bucket"
     mock.list_materials.return_value = [blob1, blob2]
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(LIST_URL)
@@ -94,7 +101,7 @@ async def test_list_materials_skips_blobs_without_material_id():
     mock = AsyncMock(spec=StorageClient)
     mock.bucket_name = "test-bucket"
     mock.list_materials.return_value = [good_blob, bad_blob]
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(LIST_URL)
@@ -107,7 +114,7 @@ async def test_list_materials_returns_500_on_storage_error():
     mock = AsyncMock(spec=StorageClient)
     mock.bucket_name = "test-bucket"
     mock.list_materials.side_effect = StorageError("bucket unavailable")
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(LIST_URL)
@@ -130,7 +137,7 @@ async def test_get_material_returns_200_with_preview_url():
     mock.bucket_name = "test-bucket"
     mock.get_material_blobs.return_value = [blob]
     mock.get_signed_url.return_value = signed_url
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(DETAIL_URL.format(material_id="mat_abc123"))
@@ -151,7 +158,7 @@ async def test_get_material_calls_get_material_blobs_with_correct_id():
     mock.bucket_name = "test-bucket"
     mock.get_material_blobs.return_value = [blob]
     mock.get_signed_url.return_value = "https://example.com/url"
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.get(DETAIL_URL.format(material_id="mat_abc123"))
@@ -164,7 +171,7 @@ async def test_get_material_returns_404_when_not_found():
     mock = AsyncMock(spec=StorageClient)
     mock.bucket_name = "test-bucket"
     mock.get_material_blobs.return_value = []
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(DETAIL_URL.format(material_id="mat_invalid"))
@@ -180,7 +187,7 @@ async def test_get_material_returns_500_on_listing_error():
     mock = AsyncMock(spec=StorageClient)
     mock.bucket_name = "test-bucket"
     mock.get_material_blobs.side_effect = StorageError("permission denied")
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(DETAIL_URL.format(material_id="mat_abc123"))
@@ -197,7 +204,7 @@ async def test_get_material_returns_500_on_signed_url_error():
     mock.bucket_name = "test-bucket"
     mock.get_material_blobs.return_value = [blob]
     mock.get_signed_url.side_effect = StorageError("credentials unavailable")
-    override_storage(mock)
+    apply_storage(mock)
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(DETAIL_URL.format(material_id="mat_abc123"))

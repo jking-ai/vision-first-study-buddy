@@ -1,7 +1,6 @@
 """Material processing service -- file validation, metadata extraction, content preparation."""
 
 import base64
-from typing import BinaryIO
 
 from app.config import Settings
 
@@ -13,6 +12,20 @@ SUPPORTED_MIME_TYPES = {
     "application/pdf",
     "application/epub+zip",
 }
+
+
+class FileValidationError(ValueError):
+    """Raised by MaterialProcessor.validate_file() when a file fails validation.
+
+    Attributes:
+        code: Machine-readable error code (e.g., 'UNSUPPORTED_FILE_TYPE').
+        message: Human-readable description suitable for the API error response.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
 
 
 class MaterialProcessor:
@@ -39,21 +52,26 @@ class MaterialProcessor:
             size_bytes: File size in bytes.
 
         Raises:
-            ValueError: If file type is unsupported or file exceeds size limit.
-                The message is prefixed with the error code:
-                "UNSUPPORTED_FILE_TYPE: ..." or "FILE_TOO_LARGE: ..."
+            FileValidationError: If file type is unsupported or file exceeds size limit.
+                Check .code for 'UNSUPPORTED_FILE_TYPE' or 'FILE_TOO_LARGE'.
         """
         if content_type not in SUPPORTED_MIME_TYPES:
             accepted = ", ".join(sorted(SUPPORTED_MIME_TYPES))
-            raise ValueError(
-                f"UNSUPPORTED_FILE_TYPE: File type '{content_type}' is not supported. "
-                f"Accepted types: {accepted}."
+            raise FileValidationError(
+                code="UNSUPPORTED_FILE_TYPE",
+                message=(
+                    f"File type '{content_type}' is not supported. "
+                    f"Accepted types: {accepted}."
+                ),
             )
         if size_bytes > self._max_size_bytes:
             max_mb = self._max_size_bytes // (1024 * 1024)
-            raise ValueError(
-                f"FILE_TOO_LARGE: File '{filename}' is too large "
-                f"({size_bytes} bytes). Maximum allowed size is {max_mb} MB."
+            raise FileValidationError(
+                code="FILE_TOO_LARGE",
+                message=(
+                    f"File '{filename}' is too large "
+                    f"({size_bytes} bytes). Maximum allowed size is {max_mb} MB."
+                ),
             )
 
     def extract_metadata(self, filename: str, content_type: str, size_bytes: int) -> dict:
@@ -89,7 +107,7 @@ class MaterialProcessor:
             - Epubs: {"text": <extracted_text>}
 
         Raises:
-            ValueError: If the content_type is not supported.
+            FileValidationError: If the content_type is not supported.
         """
         if content_type in ("image/jpeg", "image/png", "image/webp", "application/pdf"):
             encoded = base64.b64encode(file_data).decode("utf-8")
@@ -98,7 +116,10 @@ class MaterialProcessor:
             text = self._extract_epub_text(file_data)
             return {"text": text}
         else:
-            raise ValueError(f"UNSUPPORTED_FILE_TYPE: Cannot prepare content for '{content_type}'")
+            raise FileValidationError(
+                code="UNSUPPORTED_FILE_TYPE",
+                message=f"Cannot prepare content for unsupported type '{content_type}'.",
+            )
 
     def _extract_epub_text(self, file_data: bytes) -> str:
         """Extract plain text from an epub file.

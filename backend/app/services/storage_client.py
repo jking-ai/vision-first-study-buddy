@@ -54,6 +54,23 @@ class StorageClient:
         except Exception as e:
             raise StorageError(f"Failed to upload file to {destination_path}: {e}") from e
 
+    async def delete_file(self, storage_path: str) -> None:
+        """Delete a file from Firebase Storage.
+
+        Args:
+            storage_path: Storage path of the file to delete.
+
+        Raises:
+            StorageError: If deletion fails.
+        """
+        try:
+            blob = self.bucket.blob(storage_path)
+            await asyncio.to_thread(blob.delete)
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to delete file at {storage_path}: {e}") from e
+
     async def get_signed_url(self, storage_path: str, expiration_minutes: int = 60) -> str:
         """Generate a signed URL for temporary read access to a file.
 
