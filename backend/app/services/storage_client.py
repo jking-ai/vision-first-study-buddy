@@ -101,7 +101,8 @@ class StorageClient:
         """List all materials in the storage bucket.
 
         Returns:
-            List of dicts with material metadata (path, name, size, content_type).
+            List of dicts with material metadata:
+            path, name, size, content_type, material_id, time_created.
 
         Raises:
             StorageError: If listing fails.
@@ -109,18 +110,62 @@ class StorageClient:
         try:
             def _fetch():
                 blobs = self.bucket.list_blobs(prefix="materials/")
-                return [
-                    {
-                        "path": blob.name,
-                        "name": blob.name.split("/")[-1],
-                        "size": blob.size,
-                        "content_type": blob.content_type,
-                    }
-                    for blob in blobs
-                ]
+                results = []
+                for blob in blobs:
+                    parts = blob.name.split("/")
+                    material_id = parts[1] if len(parts) >= 3 else ""
+                    results.append(
+                        {
+                            "path": blob.name,
+                            "name": blob.name.split("/")[-1],
+                            "size": blob.size,
+                            "content_type": blob.content_type,
+                            "material_id": material_id,
+                            "time_created": blob.time_created,
+                        }
+                    )
+                return results
 
             return await asyncio.to_thread(_fetch)
         except StorageError:
             raise
         except Exception as e:
             raise StorageError(f"Failed to list materials: {e}") from e
+
+    async def get_material_blobs(self, material_id: str) -> list[dict]:
+        """List blobs for a specific material ID.
+
+        Args:
+            material_id: The material identifier (e.g., mat_abc123).
+
+        Returns:
+            List of dicts with blob metadata (same shape as list_materials).
+            Empty list if no blobs found under this material_id.
+
+        Raises:
+            StorageError: If listing fails.
+        """
+        try:
+            prefix = f"materials/{material_id}/"
+
+            def _fetch():
+                blobs = self.bucket.list_blobs(prefix=prefix)
+                results = []
+                for blob in blobs:
+                    results.append(
+                        {
+                            "path": blob.name,
+                            "name": blob.name.split("/")[-1],
+                            "size": blob.size,
+                            "content_type": blob.content_type,
+                            "material_id": material_id,
+                            "time_created": blob.time_created,
+                        }
+                    )
+                return results
+
+            return await asyncio.to_thread(_fetch)
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to list blobs for material '{material_id}': {e}") from e

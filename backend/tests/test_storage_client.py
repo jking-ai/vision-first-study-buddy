@@ -14,10 +14,12 @@ from app.services.storage_client import StorageClient, StorageError
 
 
 def make_mock_blob(name="materials/mat_abc/photo.jpg", size=1024, content_type="image/jpeg"):
+    from datetime import datetime, timezone
     blob = MagicMock()
     blob.name = name
     blob.size = size
     blob.content_type = content_type
+    blob.time_created = datetime(2026, 2, 27, 10, 30, 0, tzinfo=timezone.utc)
     return blob
 
 
@@ -257,18 +259,25 @@ async def test_list_materials_returns_metadata_dicts():
         client = StorageClient("test-project.appspot.com")
         result = await client.list_materials()
 
+    from datetime import datetime, timezone
+    fixed_dt = datetime(2026, 2, 27, 10, 30, 0, tzinfo=timezone.utc)
+
     assert len(result) == 2
     assert result[0] == {
         "path": "materials/mat_abc/photo.jpg",
         "name": "photo.jpg",
         "size": 2048,
         "content_type": "image/jpeg",
+        "material_id": "mat_abc",
+        "time_created": fixed_dt,
     }
     assert result[1] == {
         "path": "materials/mat_xyz/notes.pdf",
         "name": "notes.pdf",
         "size": 51200,
         "content_type": "application/pdf",
+        "material_id": "mat_xyz",
+        "time_created": fixed_dt,
     }
 
 
