@@ -53,15 +53,15 @@
 #### 2.1 Material Upload Endpoint
 
 **Acceptance criteria:**
-- [ ] `POST /api/v1/materials/upload` accepts multipart file uploads
-- [ ] File validation: rejects unsupported MIME types with `UNSUPPORTED_FILE_TYPE` error
-- [ ] File validation: rejects files over 20 MB with `FILE_TOO_LARGE` error
-- [ ] Accepted types: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`, `application/epub+zip`
-- [ ] Each file is uploaded to Firebase Storage under `materials/{material_id}/{filename}`
-- [ ] Returns a list of `MaterialResponse` objects with IDs, filenames, content types, sizes, and timestamps
-- [ ] `GET /api/v1/materials` returns all uploaded materials
-- [ ] `GET /api/v1/materials/{id}` returns a single material with a signed preview URL
-- [ ] Returns 404 with `MATERIAL_NOT_FOUND` for invalid material IDs
+- [x] `POST /api/v1/materials/upload` accepts multipart file uploads
+- [x] File validation: rejects unsupported MIME types with `UNSUPPORTED_FILE_TYPE` error
+- [x] File validation: rejects files over 20 MB with `FILE_TOO_LARGE` error
+- [x] Accepted types: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`, `application/epub+zip`
+- [x] Each file is uploaded to Firebase Storage under `materials/{material_id}/{filename}`
+- [x] Returns a list of `MaterialResponse` objects with IDs, filenames, content types, sizes, and timestamps
+- [x] `GET /api/v1/materials` returns all uploaded materials
+- [x] `GET /api/v1/materials/{id}` returns a single material with a signed preview URL
+- [x] Returns 404 with `MATERIAL_NOT_FOUND` for invalid material IDs
 
 #### 2.2 Study Guide Generation
 
