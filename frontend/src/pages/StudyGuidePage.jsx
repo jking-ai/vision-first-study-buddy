@@ -1,24 +1,23 @@
 import React from "react";
+import { Container, Typography } from "@mui/material";
 
 /**
  * StudyGuidePage -- study guide generation and display.
  *
- * TODO: Implement with:
- * - Material selection summary (which materials are included)
- * - Options: focus topics input (Chip-based), detail level selector (ToggleButtonGroup)
- * - "Generate" button that triggers study guide generation
- * - Loading state with skeleton or spinner ("Analyzing your materials...")
- * - StudyGuideView component for displaying the result
- * - Error state with retry button
- * - Integration with useStudyGuide hook
+ * TODO (Phase 4+): Material selection summary, focus topics input,
+ * detail level selector, Generate button, loading state, StudyGuideView,
+ * error state with retry. Uses useStudyGuide hook.
  */
 function StudyGuidePage() {
-  // TODO: Implement study guide page
   return (
-    <div>
-      <h1>Study Guide</h1>
-      <p>TODO: Implement StudyGuidePage with generation options and result view.</p>
-    </div>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Typography variant="h1" gutterBottom>
+        Study Guide
+      </Typography>
+      <Typography variant="body1" color="text.secondary">
+        Select materials and generate a personalized study guide.
+      </Typography>
+    </Container>
   );
 }
 

@@ -3,11 +3,9 @@
  *
  * Wraps fetch calls to the FastAPI backend with error handling
  * and response parsing.
- *
- * TODO: Implement all API methods
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const API_PREFIX = "/api/v1";
 
 /**
@@ -17,72 +15,84 @@ const API_PREFIX = "/api/v1";
  * @returns {Promise<object>} Parsed JSON response
  */
 async function request(path, options = {}) {
-  // TODO: Implement base request function
-  // 1. Build full URL from API_BASE_URL + API_PREFIX + path
-  // 2. Set default headers (Content-Type: application/json)
-  // 3. Make fetch call
-  // 4. Handle error responses (parse error body, throw with message)
-  // 5. Parse and return JSON response
-  throw new Error("API client not yet implemented");
+  const url = `${API_BASE_URL}${API_PREFIX}${path}`;
+
+  const headers = { ...options.headers };
+  // Only set Content-Type for JSON bodies; omit for FormData so the browser
+  // sets the multipart boundary automatically.
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  let response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch {
+    throw new Error("Network error — is the backend running?");
+  }
+
+  if (!response.ok) {
+    let message = response.statusText;
+    try {
+      const body = await response.json();
+      message = body.detail || body.message || message;
+    } catch {
+      // ignore parse errors; use statusText
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
 }
 
 export const apiClient = {
   /** Health check */
-  health: () => {
-    // TODO: return request("/health");
-    throw new Error("Not implemented");
-  },
+  health: () => request("/health"),
 
-  /** Upload files */
+  /** Upload files to Firebase Storage */
   uploadMaterials: (files) => {
-    // TODO: Build FormData and POST to /materials/upload
-    // const formData = new FormData();
-    // files.forEach((file) => formData.append("files", file));
-    // return request("/materials/upload", { method: "POST", body: formData });
-    throw new Error("Not implemented");
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    return request("/materials/upload", { method: "POST", body: formData });
   },
 
-  /** List all materials */
-  listMaterials: () => {
-    // TODO: return request("/materials");
-    throw new Error("Not implemented");
-  },
+  /** List all uploaded materials */
+  listMaterials: () => request("/materials"),
 
-  /** Get material details */
-  getMaterial: (id) => {
-    // TODO: return request(`/materials/${id}`);
-    throw new Error("Not implemented");
-  },
+  /** Get details for a single material */
+  getMaterial: (id) => request(`/materials/${id}`),
 
-  /** Generate a study guide */
-  generateStudyGuide: (materialIds, focusTopics, detailLevel) => {
-    // TODO: POST to /study-guides/generate with request body
-    throw new Error("Not implemented");
-  },
+  /** Generate a study guide from selected materials */
+  generateStudyGuide: (materialIds, focusTopics, detailLevel) =>
+    request("/study-guides/generate", {
+      method: "POST",
+      body: JSON.stringify({ material_ids: materialIds, focus_topics: focusTopics, detail_level: detailLevel }),
+    }),
 
-  /** Get a study guide */
-  getStudyGuide: (id) => {
-    // TODO: return request(`/study-guides/${id}`);
-    throw new Error("Not implemented");
-  },
+  /** Retrieve a generated study guide */
+  getStudyGuide: (id) => request(`/study-guides/${id}`),
 
-  /** Generate a quiz */
-  generateQuiz: (materialIds, numQuestions, difficulty, questionTypes) => {
-    // TODO: POST to /quizzes/generate with request body
-    throw new Error("Not implemented");
-  },
+  /** Generate a quiz from selected materials */
+  generateQuiz: (materialIds, numQuestions, difficulty, questionTypes) =>
+    request("/quizzes/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        material_ids: materialIds,
+        num_questions: numQuestions,
+        difficulty,
+        question_types: questionTypes,
+      }),
+    }),
 
-  /** Get a quiz */
-  getQuiz: (id) => {
-    // TODO: return request(`/quizzes/${id}`);
-    throw new Error("Not implemented");
-  },
+  /** Retrieve a generated quiz */
+  getQuiz: (id) => request(`/quizzes/${id}`),
 
-  /** Submit quiz answers */
-  submitQuiz: (quizId, answers) => {
-    // TODO: POST to /quizzes/{quizId}/submit with answers
-    throw new Error("Not implemented");
-  },
+  /** Submit quiz answers for grading */
+  submitQuiz: (quizId, answers) =>
+    request(`/quizzes/${quizId}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ answers }),
+    }),
 };
 
 export default apiClient;

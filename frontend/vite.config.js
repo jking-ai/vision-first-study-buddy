@@ -6,17 +6,15 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // TODO: Configure proxy for backend API during development
-    // proxy: {
-    //   '/api': {
-    //     target: 'http://localhost:8000',
-    //     changeOrigin: true,
-    //   },
-    // },
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
   },
-  // TODO: Configure build options for production
-  // build: {
-  //   outDir: 'dist',
-  //   sourcemap: true,
-  // },
+  build: {
+    outDir: "dist",
+    sourcemap: true,
+  },
 });

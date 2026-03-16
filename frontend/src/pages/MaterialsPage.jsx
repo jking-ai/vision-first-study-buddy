@@ -1,23 +1,22 @@
 import React from "react";
+import { Container, Typography } from "@mui/material";
 
 /**
  * MaterialsPage -- material management and selection view.
  *
- * TODO: Implement with:
- * - MaterialUpload component at the top
- * - CameraCapture component (toggle or tab)
- * - MaterialList component showing all uploaded materials
- * - Selection mode for choosing materials for study guide or quiz generation
- * - Action buttons: "Generate Study Guide" and "Generate Quiz" (enabled when materials selected)
- * - Navigation to StudyGuidePage or QuizPage with selected material IDs
+ * TODO (Phase 4+): MaterialUpload component, CameraCapture toggle,
+ * MaterialList with selection mode, action buttons for study guide / quiz.
  */
 function MaterialsPage() {
-  // TODO: Implement materials management page
   return (
-    <div>
-      <h1>My Materials</h1>
-      <p>TODO: Implement MaterialsPage with upload, list, and selection.</p>
-    </div>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Typography variant="h1" gutterBottom>
+        My Materials
+      </Typography>
+      <Typography variant="body1" color="text.secondary">
+        Upload and manage your study materials here.
+      </Typography>
+    </Container>
   );
 }
 
