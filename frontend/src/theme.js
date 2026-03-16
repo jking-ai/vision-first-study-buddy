@@ -1,44 +1,43 @@
-// TODO: Import MUI createTheme
-// import { createTheme } from "@mui/material/styles";
+import { createTheme } from "@mui/material/styles";
 
 /**
- * MUI theme configuration for Vision-First Study Buddy.
+ * Create a MUI theme for Vision-First Study Buddy.
  *
- * Supports light and dark mode with a study-friendly color palette.
- * Optimized for readability on mobile devices.
- *
- * TODO: Implement custom theme with:
- * - Primary color palette (study-friendly blues/greens)
- * - Dark mode configuration
- * - Typography scale optimized for reading
- * - Component overrides for cards, buttons, and inputs
- * - Responsive breakpoints for mobile-first design
+ * @param {"light"|"dark"} mode - Color mode
+ * @returns {import("@mui/material").Theme}
  */
+export function createAppTheme(mode) {
+  return createTheme({
+    palette: {
+      mode,
+      primary: {
+        main: "#1976d2",
+      },
+      secondary: {
+        main: "#388e3c",
+      },
+    },
+    typography: {
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+      h1: { fontSize: "2rem", fontWeight: 600 },
+      h2: { fontSize: "1.5rem", fontWeight: 600 },
+      body1: { fontSize: "1rem", lineHeight: 1.6 },
+    },
+    components: {
+      MuiCard: {
+        defaultProps: {
+          elevation: 2,
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            borderRadius: 8,
+          },
+        },
+      },
+    },
+  });
+}
 
-// const theme = createTheme({
-//   palette: {
-//     mode: "light",
-//     primary: {
-//       main: "#1976d2",
-//     },
-//     secondary: {
-//       main: "#388e3c",
-//     },
-//   },
-//   typography: {
-//     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-//     h1: { fontSize: "2rem", fontWeight: 600 },
-//     h2: { fontSize: "1.5rem", fontWeight: 600 },
-//     body1: { fontSize: "1rem", lineHeight: 1.6 },
-//   },
-//   components: {
-//     MuiCard: {
-//       defaultProps: {
-//         elevation: 2,
-//       },
-//     },
-//   },
-// });
-
-// export default theme;
-export default {};
+export default createAppTheme;
