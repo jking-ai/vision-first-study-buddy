@@ -1,5 +1,6 @@
 """Firebase Storage client -- handles file upload, download, and URL generation."""
 
+import asyncio
 from datetime import timedelta
 
 import firebase_admin
@@ -46,8 +47,10 @@ class StorageClient:
         """
         try:
             blob = self.bucket.blob(destination_path)
-            blob.upload_from_string(file_data, content_type=content_type)
+            await asyncio.to_thread(blob.upload_from_string, file_data, content_type=content_type)
             return f"gs://{self.bucket_name}/{destination_path}"
+        except StorageError:
+            raise
         except Exception as e:
             raise StorageError(f"Failed to upload file to {destination_path}: {e}") from e
 
@@ -66,7 +69,11 @@ class StorageClient:
         """
         try:
             blob = self.bucket.blob(storage_path)
-            return blob.generate_signed_url(expiration=timedelta(minutes=expiration_minutes))
+            return await asyncio.to_thread(
+                blob.generate_signed_url, expiration=timedelta(minutes=expiration_minutes)
+            )
+        except StorageError:
+            raise
         except Exception as e:
             raise StorageError(f"Failed to generate signed URL for {storage_path}: {e}") from e
 
@@ -84,7 +91,9 @@ class StorageClient:
         """
         try:
             blob = self.bucket.blob(storage_path)
-            return blob.download_as_bytes()
+            return await asyncio.to_thread(blob.download_as_bytes)
+        except StorageError:
+            raise
         except Exception as e:
             raise StorageError(f"Failed to download file from {storage_path}: {e}") from e
 
@@ -98,15 +107,20 @@ class StorageClient:
             StorageError: If listing fails.
         """
         try:
-            blobs = self.bucket.list_blobs(prefix="materials/")
-            return [
-                {
-                    "path": blob.name,
-                    "name": blob.name.split("/")[-1],
-                    "size": blob.size,
-                    "content_type": blob.content_type,
-                }
-                for blob in blobs
-            ]
+            def _fetch():
+                blobs = self.bucket.list_blobs(prefix="materials/")
+                return [
+                    {
+                        "path": blob.name,
+                        "name": blob.name.split("/")[-1],
+                        "size": blob.size,
+                        "content_type": blob.content_type,
+                    }
+                    for blob in blobs
+                ]
+
+            return await asyncio.to_thread(_fetch)
+        except StorageError:
+            raise
         except Exception as e:
             raise StorageError(f"Failed to list materials: {e}") from e
