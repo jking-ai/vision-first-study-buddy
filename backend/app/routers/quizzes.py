@@ -1,20 +1,25 @@
 """Quizzes router -- generate, retrieve, and grade quizzes."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 
-# TODO: Import services and models once implemented
-# from app.services.quiz_generator import QuizGenerator
-# from app.models.requests import GenerateQuizRequest, SubmitQuizRequest
-# from app.models.responses import QuizResponse, QuizSubmissionResponse
+from app.dependencies import get_quiz_generator
+from app.models.requests import GenerateQuizRequest, SubmitQuizRequest
+from app.models.responses import Quiz, QuizResponse, QuizSubmissionResponse
+from app.services.gemini_client import GenerationError, ModelUnavailableError
+from app.services.quiz_generator import QuizGenerator
 
 router = APIRouter()
 
-# TODO: In-memory storage for generated quizzes
-# _quizzes: dict[str, dict] = {}
+# In-memory storage for generated quizzes (keyed by quiz ID).
+# No database is used in this project — generated content lives in process memory.
+_quizzes: dict[str, QuizResponse] = {}
 
 
-@router.post("/quizzes/generate")
-async def generate_quiz():
+@router.post("/quizzes/generate", response_model=QuizResponse, status_code=201)
+async def generate_quiz(
+    request: GenerateQuizRequest,
+    quiz_generator: QuizGenerator = Depends(get_quiz_generator),
+) -> QuizResponse:
     """Generate a quiz from one or more uploaded materials.
 
     Fetches the specified materials from Firebase Storage, sends them
@@ -29,45 +34,70 @@ async def generate_quiz():
         QuizResponse with the generated quiz and metadata.
 
     Raises:
-        HTTPException 400: If no material IDs are provided.
-        HTTPException 404: If any material ID does not exist.
+        HTTPException 400: If any material ID has no uploaded files.
         HTTPException 500: If Gemini generation fails.
+        HTTPException 503: If the Gemini model is unavailable.
     """
-    # TODO: Implement quiz generation
-    # 1. Validate request (at least one material_id)
-    # 2. Fetch materials from Firebase Storage
-    # 3. Build multimodal prompt with images/PDFs + quiz template
-    # 4. Call Gemini with structured output schema
-    # 5. Parse response into Quiz model
-    # 6. Store in in-memory dict with generated ID (qz_ + uuid4)
-    # 7. Return QuizResponse with metadata
-    raise NotImplementedError("Quiz generation not yet implemented")
+    try:
+        result = await quiz_generator.generate(
+            material_ids=request.material_ids,
+            num_questions=request.num_questions,
+            difficulty=request.difficulty.value,
+            question_types=[qt.value for qt in request.question_types],
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "VALIDATION_ERROR", "message": str(e)},
+        )
+    except ModelUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MODEL_UNAVAILABLE", "message": "Gemini model is currently unavailable."},
+        )
+    except GenerationError as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "GENERATION_FAILED", "message": str(e)},
+        )
+
+    _quizzes[result.quiz.id] = result
+    return result
 
 
-@router.get("/quizzes/{quiz_id}")
-async def get_quiz(quiz_id: str):
+@router.get("/quizzes/{quiz_id}", response_model=QuizResponse)
+async def get_quiz(quiz_id: str) -> QuizResponse:
     """Retrieve a previously generated quiz by ID.
 
     Args:
-        quiz_id: The unique quiz identifier (e.g., qz_m1n2o3p4).
+        quiz_id: The unique quiz identifier (e.g., qz_a1b2c3d4).
 
     Returns:
-        Quiz object.
+        QuizResponse with the full quiz.
 
     Raises:
         HTTPException 404: If the quiz ID does not exist.
     """
-    # TODO: Implement quiz retrieval from in-memory storage
-    raise NotImplementedError("Get quiz endpoint not yet implemented")
+    stored = _quizzes.get(quiz_id)
+    if stored is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "QUIZ_NOT_FOUND", "message": f"Quiz '{quiz_id}' not found."},
+        )
+    return stored
 
 
-@router.post("/quizzes/{quiz_id}/submit")
-async def submit_quiz(quiz_id: str):
+@router.post("/quizzes/{quiz_id}/submit", response_model=QuizSubmissionResponse)
+async def submit_quiz(
+    quiz_id: str,
+    request: SubmitQuizRequest,
+    quiz_generator: QuizGenerator = Depends(get_quiz_generator),
+) -> QuizSubmissionResponse:
     """Submit answers for a quiz and receive graded results.
 
-    Multiple choice answers are graded with exact match. Short answer
-    questions are graded by sending the student answer and correct answer
-    to Gemini for semantic comparison.
+    Multiple choice and true/false answers are graded with exact match.
+    Short answer questions are graded by sending the student answer and
+    correct answer to Gemini for semantic comparison.
 
     Args:
         quiz_id: The unique quiz identifier.
@@ -79,12 +109,35 @@ async def submit_quiz(quiz_id: str):
     Raises:
         HTTPException 404: If the quiz ID does not exist.
         HTTPException 400: If answers reference invalid question IDs.
+        HTTPException 500: If Gemini grading fails.
     """
-    # TODO: Implement quiz submission and grading
-    # 1. Look up quiz by ID (404 if not found)
-    # 2. Validate that all question_ids in answers exist in the quiz
-    # 3. Grade multiple choice: exact letter match (case-insensitive)
-    # 4. Grade short answer: send to Gemini for semantic comparison
-    # 5. Calculate score (correct, total, percentage)
-    # 6. Return QuizSubmissionResponse with results
-    raise NotImplementedError("Quiz submission not yet implemented")
+    stored = _quizzes.get(quiz_id)
+    if stored is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "QUIZ_NOT_FOUND", "message": f"Quiz '{quiz_id}' not found."},
+        )
+
+    valid_question_ids = {q.id for q in stored.quiz.questions}
+    invalid_ids = [a.question_id for a in request.answers if a.question_id not in valid_question_ids]
+    if invalid_ids:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "VALIDATION_ERROR",
+                "message": f"Invalid question IDs: {', '.join(invalid_ids)}",
+            },
+        )
+
+    try:
+        result = await quiz_generator.grade_submission(
+            quiz=stored.quiz,
+            answers=[{"question_id": a.question_id, "answer": a.answer} for a in request.answers],
+        )
+    except GenerationError as e:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "GENERATION_FAILED", "message": str(e)},
+        )
+
+    return result

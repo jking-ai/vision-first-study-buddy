@@ -12,12 +12,15 @@ os.environ.setdefault("FIREBASE_STORAGE_BUCKET", "test-project.appspot.com")
 
 @pytest.fixture(autouse=True)
 def clear_settings_cache():
-    """Clear the lru_cache on get_settings and any DI overrides between tests."""
+    """Clear lru_caches and DI overrides between tests."""
     from app.config import get_settings
+    from app.dependencies import _cached_gemini_client
     from app.main import app
 
     get_settings.cache_clear()
+    _cached_gemini_client.cache_clear()
     app.dependency_overrides.clear()
     yield
     get_settings.cache_clear()
+    _cached_gemini_client.cache_clear()
     app.dependency_overrides.clear()

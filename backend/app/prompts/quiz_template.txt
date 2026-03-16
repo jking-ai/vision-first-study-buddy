@@ -33,10 +33,6 @@ Respond with a JSON object containing:
   - "type": One of "multiple_choice", "short_answer", "true_false"
   - "difficulty": One of "easy", "medium", "hard"
   - "question": The question text
-  - "options": Array of option strings (for multiple choice only, empty for others)
-  - "correct_answer": The correct answer
+  - "options": Array of option strings (for multiple choice only, empty array for others)
+  - "correct_answer": The correct answer (letter A/B/C/D for MC, "True"/"False" for TF, sentence for short answer)
   - "explanation": Explanation of the correct answer
-
-TODO: Refine this template based on testing with real student materials.
-TODO: Add Bloom's taxonomy level targeting (recall, comprehension, application).
-TODO: Add handling for diagram-based questions.
