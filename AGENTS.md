@@ -12,19 +12,28 @@ Vision-First Study Buddy is a multimodal study tool that consumes hand-written n
 - **Storage:** Firebase Storage for uploaded images, PDFs, and epubs
 - **Data:** No database -- uploaded materials are stored in Firebase Storage; generated content is returned directly to the client
 
-**Status:** Pre-build (planning docs only, no code yet).
+**Status:** Phase 1 complete — FastAPI app is wired up with config validation, CORS, all 5 routers mounted, and a working health endpoint at `GET /api/v1/health`.
 
 ## Build & Run Commands
 
 ### Backend (`backend/` directory)
 ```bash
 cd backend
-# TODO: Add commands once backend is scaffolded
 pip install -r requirements.txt    # Install dependencies
 uvicorn app.main:app --reload      # Local dev server on :8000
+pytest                             # Run tests
 docker build -t vfsb-backend .     # Build container
-docker run -p 8000:8000 vfsb-backend  # Run container locally
+docker run -p 8000:8000 \
+  -e GCP_PROJECT_ID=your-project \
+  -e FIREBASE_STORAGE_BUCKET=your-project.appspot.com \
+  vfsb-backend                     # Run container locally
 ```
+
+**Required environment variables** (set in `backend/.env` or your shell):
+- `GCP_PROJECT_ID` — GCP project ID (required; app fails to start without it)
+- `FIREBASE_STORAGE_BUCKET` — Firebase Storage bucket (required; app fails to start without it)
+
+See `backend/.env.example` for all variables.
 
 ### Frontend (`frontend/` directory)
 ```bash

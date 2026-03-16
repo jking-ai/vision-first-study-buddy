@@ -2,8 +2,8 @@
 
 from functools import lru_cache
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,6 +11,11 @@ class Settings(BaseSettings):
 
     See backend/.env.example for the full list of required variables.
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
     # Google Cloud Platform
     gcp_project_id: str = ""
@@ -28,28 +33,27 @@ class Settings(BaseSettings):
     # File upload limits
     max_file_size_mb: int = 20
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
-
-    @field_validator("gcp_project_id")
-    @classmethod
-    def require_gcp_project_id(cls, v: str) -> str:
-        if not v:
-            raise ValueError("GCP_PROJECT_ID is required but was not set")
-        return v
-
-    @field_validator("firebase_storage_bucket")
-    @classmethod
-    def require_firebase_storage_bucket(cls, v: str) -> str:
-        if not v:
-            raise ValueError("FIREBASE_STORAGE_BUCKET is required but was not set")
-        return v
-
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def parse_allowed_origins(cls, v: object) -> list[str]:
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v  # type: ignore[return-value]
+
+    @model_validator(mode="after")
+    def validate_required_fields(self) -> "Settings":
+        """Raise a combined error at startup if any required field is missing."""
+        missing = []
+        if not self.gcp_project_id:
+            missing.append("GCP_PROJECT_ID")
+        if not self.firebase_storage_bucket:
+            missing.append("FIREBASE_STORAGE_BUCKET")
+        if missing:
+            raise ValueError(
+                f"Missing required environment variable(s): {', '.join(missing)}. "
+                "Set them in your .env file or environment before starting the server."
+            )
+        return self
 
 
 @lru_cache
