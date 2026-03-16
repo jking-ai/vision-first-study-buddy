@@ -1,8 +1,10 @@
 """Firebase Storage client -- handles file upload, download, and URL generation."""
 
-# TODO: Import Firebase Admin SDK
-# import firebase_admin
-# from firebase_admin import credentials, storage
+import asyncio
+from datetime import timedelta
+
+import firebase_admin
+from firebase_admin import storage
 
 
 class StorageError(Exception):
@@ -24,10 +26,9 @@ class StorageClient:
         Args:
             bucket_name: Firebase Storage bucket name (e.g., project-id.appspot.com).
         """
-        # TODO: Initialize Firebase Admin SDK and get bucket reference
-        # if not firebase_admin._apps:
-        #     firebase_admin.initialize_app()
-        # self.bucket = storage.bucket(bucket_name)
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app()
+        self.bucket = storage.bucket(bucket_name)
         self.bucket_name = bucket_name
 
     async def upload_file(self, file_data: bytes, destination_path: str, content_type: str) -> str:
@@ -44,12 +45,14 @@ class StorageClient:
         Raises:
             StorageError: If the upload fails.
         """
-        # TODO: Implement file upload
-        # 1. Create a blob at the destination path
-        # 2. Upload file_data with the specified content_type
-        # 3. Return the gs:// URL
-        # 4. Wrap exceptions in StorageError
-        raise NotImplementedError
+        try:
+            blob = self.bucket.blob(destination_path)
+            await asyncio.to_thread(blob.upload_from_string, file_data, content_type=content_type)
+            return f"gs://{self.bucket_name}/{destination_path}"
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to upload file to {destination_path}: {e}") from e
 
     async def get_signed_url(self, storage_path: str, expiration_minutes: int = 60) -> str:
         """Generate a signed URL for temporary read access to a file.
@@ -64,11 +67,15 @@ class StorageClient:
         Raises:
             StorageError: If URL generation fails.
         """
-        # TODO: Implement signed URL generation
-        # 1. Get blob reference at storage_path
-        # 2. Generate signed URL with expiration
-        # 3. Return the URL
-        raise NotImplementedError
+        try:
+            blob = self.bucket.blob(storage_path)
+            return await asyncio.to_thread(
+                blob.generate_signed_url, expiration=timedelta(minutes=expiration_minutes)
+            )
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to generate signed URL for {storage_path}: {e}") from e
 
     async def get_file_bytes(self, storage_path: str) -> bytes:
         """Download file contents from Firebase Storage.
@@ -82,11 +89,13 @@ class StorageClient:
         Raises:
             StorageError: If download fails or file not found.
         """
-        # TODO: Implement file download
-        # 1. Get blob reference at storage_path
-        # 2. Download as bytes
-        # 3. Return bytes
-        raise NotImplementedError
+        try:
+            blob = self.bucket.blob(storage_path)
+            return await asyncio.to_thread(blob.download_as_bytes)
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to download file from {storage_path}: {e}") from e
 
     async def list_materials(self) -> list[dict]:
         """List all materials in the storage bucket.
@@ -97,8 +106,21 @@ class StorageClient:
         Raises:
             StorageError: If listing fails.
         """
-        # TODO: Implement material listing
-        # 1. List blobs under the materials/ prefix
-        # 2. Extract metadata from each blob
-        # 3. Return list of metadata dicts
-        raise NotImplementedError
+        try:
+            def _fetch():
+                blobs = self.bucket.list_blobs(prefix="materials/")
+                return [
+                    {
+                        "path": blob.name,
+                        "name": blob.name.split("/")[-1],
+                        "size": blob.size,
+                        "content_type": blob.content_type,
+                    }
+                    for blob in blobs
+                ]
+
+            return await asyncio.to_thread(_fetch)
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to list materials: {e}") from e
