@@ -49,6 +49,7 @@ The Cloud Run service is deployed with `--allow-unauthenticated` (it has to be, 
   | `POST /api/v1/materials/upload` | 10 | 100 |
 
   Health, list, and get-by-id endpoints are not limited. Limits live in `backend/app/rate_limit.py`. Hits return HTTP 429 with `{"detail": {"code": "RATE_LIMITED", "message": ...}}` and a `Retry-After: 60` header.
+- **`--max-instances=1`** on the Cloud Run service. This pins the in-memory rate-limit bucket to a single instance (so per-IP counters are consistent rather than fragmented across scaled-out instances) and caps compute spend.
 - **OpenAPI docs disabled in production**: `DOCS_ENABLED` is `false` by default, which sets `docs_url`, `redoc_url`, and `openapi_url` to `None`. `/docs` and `/redoc` return 404 in prod, so the API surface map isn't advertised to scrapers.
 - **CORS allow-list**: `ALLOWED_ORIGINS` defaults to empty (non-permissive) in code; production must opt in explicitly.
 - **Budget alert**: a GCP budget alert on Vertex AI / Cloud Run spend is configured separately via the GCP console.
