@@ -34,7 +34,7 @@ def _cached_gemini_client(project_id: str, region: str, model_name: str) -> Gemi
 
 def get_gemini_client(settings: Settings = Depends(get_settings)) -> GeminiClient:
     """Return a cached GeminiClient configured for the current project and model."""
-    return _cached_gemini_client(settings.gcp_project_id, settings.gcp_region, settings.gemini_model)
+    return _cached_gemini_client(settings.gcp_project_id, settings.gemini_location, settings.gemini_model)
 
 
 def get_study_guide_generator(

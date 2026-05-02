@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     gcp_region: str = "us-central1"
 
     # Vertex AI / Gemini
+    gemini_location: str = "global"
     gemini_model: str = "gemini-3.1-pro-preview"
 
     # Firebase Storage
