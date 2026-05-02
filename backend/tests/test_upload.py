@@ -268,5 +268,7 @@ async def test_upload_cleans_up_already_uploaded_blobs_on_storage_error():
     # Cleanup: delete_file should have been called for the first successfully-uploaded blob
     storage.delete_file.assert_called_once()
     deleted_path = storage.delete_file.call_args[0][0]
-    assert deleted_path.startswith("materials/mat_")
+    # Path is now scoped per device-id: materials/<device_id>/<material_id>/<filename>
+    assert deleted_path.startswith("materials/")
+    assert "/mat_" in deleted_path
     assert deleted_path.endswith("/photo.jpg")

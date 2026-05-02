@@ -246,8 +246,8 @@ async def test_get_file_bytes_raises_storage_error_on_sdk_exception():
 @pytest.mark.asyncio
 async def test_list_materials_returns_metadata_dicts():
     """list_materials must return a list of dicts with path, name, size, content_type."""
-    blob1 = make_mock_blob("materials/mat_abc/photo.jpg", size=2048, content_type="image/jpeg")
-    blob2 = make_mock_blob("materials/mat_xyz/notes.pdf", size=51200, content_type="application/pdf")
+    blob1 = make_mock_blob("materials/test-device/mat_abc/photo.jpg", size=2048, content_type="image/jpeg")
+    blob2 = make_mock_blob("materials/test-device/mat_xyz/notes.pdf", size=51200, content_type="application/pdf")
 
     with patch("app.services.storage_client.firebase_admin") as mock_fa, \
          patch("app.services.storage_client.storage") as mock_storage:
@@ -257,14 +257,14 @@ async def test_list_materials_returns_metadata_dicts():
         mock_storage.bucket.return_value = mock_bucket
 
         client = StorageClient("test-project.appspot.com")
-        result = await client.list_materials()
+        result = await client.list_materials("test-device")
 
     from datetime import datetime, timezone
     fixed_dt = datetime(2026, 2, 27, 10, 30, 0, tzinfo=timezone.utc)
 
     assert len(result) == 2
     assert result[0] == {
-        "path": "materials/mat_abc/photo.jpg",
+        "path": "materials/test-device/mat_abc/photo.jpg",
         "name": "photo.jpg",
         "size": 2048,
         "content_type": "image/jpeg",
@@ -272,7 +272,7 @@ async def test_list_materials_returns_metadata_dicts():
         "time_created": fixed_dt,
     }
     assert result[1] == {
-        "path": "materials/mat_xyz/notes.pdf",
+        "path": "materials/test-device/mat_xyz/notes.pdf",
         "name": "notes.pdf",
         "size": 51200,
         "content_type": "application/pdf",
@@ -283,7 +283,7 @@ async def test_list_materials_returns_metadata_dicts():
 
 @pytest.mark.asyncio
 async def test_list_materials_queries_materials_prefix():
-    """list_materials must query the bucket with the 'materials/' prefix."""
+    """list_materials must query the bucket with the device-scoped 'materials/<device_id>/' prefix."""
     with patch("app.services.storage_client.firebase_admin") as mock_fa, \
          patch("app.services.storage_client.storage") as mock_storage:
         mock_fa._apps = {}
@@ -292,9 +292,9 @@ async def test_list_materials_queries_materials_prefix():
         mock_storage.bucket.return_value = mock_bucket
 
         client = StorageClient("test-project.appspot.com")
-        await client.list_materials()
+        await client.list_materials("test-device")
 
-    mock_bucket.list_blobs.assert_called_once_with(prefix="materials/")
+    mock_bucket.list_blobs.assert_called_once_with(prefix="materials/test-device/")
 
 
 @pytest.mark.asyncio
@@ -308,7 +308,7 @@ async def test_list_materials_returns_empty_list_when_no_blobs():
         mock_storage.bucket.return_value = mock_bucket
 
         client = StorageClient("test-project.appspot.com")
-        result = await client.list_materials()
+        result = await client.list_materials("test-device")
 
     assert result == []
 
@@ -325,4 +325,4 @@ async def test_list_materials_raises_storage_error_on_sdk_exception():
 
         client = StorageClient("test-project.appspot.com")
         with pytest.raises(StorageError, match="permission denied"):
-            await client.list_materials()
+            await client.list_materials("test-device")

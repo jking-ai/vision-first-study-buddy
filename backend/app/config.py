@@ -29,14 +29,18 @@ class Settings(BaseSettings):
     # Firebase Storage
     firebase_storage_bucket: str = ""
 
-    # CORS — accepts a JSON list or a comma-separated string from the env
-    allowed_origins: list[str] = [
-        "http://localhost:5173",
-        "http://localhost:5174",
-    ]
+    # CORS — accepts a JSON list or a comma-separated string from the env.
+    # Default is empty (non-permissive): production must set ALLOWED_ORIGINS
+    # explicitly. Local dev should set ALLOWED_ORIGINS in .env to localhost URLs.
+    allowed_origins: list[str] = []
 
     # File upload limits
     max_file_size_mb: int = 20
+
+    # Interactive docs (Swagger UI / ReDoc / OpenAPI schema).
+    # Defaults to False so production never exposes the API surface map.
+    # Set DOCS_ENABLED=true in local dev if you want /docs back.
+    docs_enabled: bool = False
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

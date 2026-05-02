@@ -196,6 +196,7 @@ class TestStudyGuideGeneratorGenerate:
             material_ids=["mat_abc123"],
             focus_topics=[],
             detail_level=DetailLevel.STANDARD,
+            device_id="test-device",
         )
         assert isinstance(result, StudyGuideResponse)
         assert result.study_guide.id.startswith("sg_")
@@ -212,6 +213,7 @@ class TestStudyGuideGeneratorGenerate:
             material_ids=["mat_abc123"],
             focus_topics=[],
             detail_level=DetailLevel.STANDARD,
+            device_id="test-device",
         )
         assert result.study_guide.source_materials == ["mat_abc123"]
 
@@ -223,6 +225,7 @@ class TestStudyGuideGeneratorGenerate:
                 material_ids=["mat_missing"],
                 focus_topics=[],
                 detail_level=DetailLevel.STANDARD,
+                device_id="test-device",
             )
 
     @pytest.mark.asyncio
@@ -234,6 +237,7 @@ class TestStudyGuideGeneratorGenerate:
                 material_ids=["mat_abc123"],
                 focus_topics=[],
                 detail_level=DetailLevel.STANDARD,
+                device_id="test-device",
             )
 
     @pytest.mark.asyncio
@@ -244,6 +248,7 @@ class TestStudyGuideGeneratorGenerate:
                 material_ids=["mat_abc123"],
                 focus_topics=[],
                 detail_level=DetailLevel.STANDARD,
+                device_id="test-device",
             )
 
     @pytest.mark.asyncio
@@ -253,6 +258,7 @@ class TestStudyGuideGeneratorGenerate:
             material_ids=["mat_abc123", "mat_xyz789"],
             focus_topics=[],
             detail_level=DetailLevel.STANDARD,
+            device_id="test-device",
         )
         assert result.metadata.model == "gemini-3.1-pro-preview"
         assert result.metadata.material_count == 2
@@ -276,6 +282,7 @@ class TestStudyGuideGeneratorGenerate:
             material_ids=["mat_1", "mat_2"],
             focus_topics=[],
             detail_level=DetailLevel.STANDARD,
+            device_id="test-device",
         )
 
         assert mock_storage.get_material_blobs.call_count == 2
@@ -399,6 +406,7 @@ async def test_generate_study_guide_passes_correct_args_to_generator():
         material_ids=["mat_abc123", "mat_xyz789"],
         focus_topics=["mitosis", "meiosis"],
         detail_level=DetailLevel.DETAILED,
+        device_id="test-device",
     )
 
 

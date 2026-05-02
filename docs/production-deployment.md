@@ -29,6 +29,29 @@ How to deploy and operate the application on Google Cloud Platform.
 | `GCP_PROJECT_ID` | `<your-gcp-project>` |
 | `FIREBASE_STORAGE_BUCKET` | `<your-storage-bucket>` |
 | `ALLOWED_ORIGINS` | `["https://<your-firebase-site>.web.app","https://<your-firebase-site>.firebaseapp.com"]` |
+| `DOCS_ENABLED` | unset (defaults to `false` — leave it off in production) |
+
+> The default for `ALLOWED_ORIGINS` in code is an empty list. Production *must* set it explicitly to the prod web app origins, or the frontend will be CORS-blocked.
+
+---
+
+## Security Posture
+
+The Cloud Run service is deployed with `--allow-unauthenticated` (it has to be, because the frontend is a static SPA with no login). Defenses against cost-runaway abuse of the Vertex AI / Gemini-backed endpoints:
+
+- **Per-IP rate limiting** via `slowapi` is enforced inside FastAPI. Limits per real client IP (resolved from `X-Forwarded-For` which Cloud Run injects, falling back to `request.client.host`):
+
+  | Endpoint | Per minute | Per day |
+  |----------|------------|---------|
+  | `POST /api/v1/study-guides/generate` | 5 | 30 |
+  | `POST /api/v1/quizzes/generate` | 5 | 30 |
+  | `POST /api/v1/quizzes/{id}/submit` | 20 | 200 |
+  | `POST /api/v1/materials/upload` | 10 | 100 |
+
+  Health, list, and get-by-id endpoints are not limited. Limits live in `backend/app/rate_limit.py`. Hits return HTTP 429 with `{"detail": {"code": "RATE_LIMITED", "message": ...}}` and a `Retry-After: 60` header.
+- **OpenAPI docs disabled in production**: `DOCS_ENABLED` is `false` by default, which sets `docs_url`, `redoc_url`, and `openapi_url` to `None`. `/docs` and `/redoc` return 404 in prod, so the API surface map isn't advertised to scrapers.
+- **CORS allow-list**: `ALLOWED_ORIGINS` defaults to empty (non-permissive) in code; production must opt in explicitly.
+- **Budget alert**: a GCP budget alert on Vertex AI / Cloud Run spend is configured separately via the GCP console.
 
 ---
 

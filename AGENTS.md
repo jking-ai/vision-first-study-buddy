@@ -32,8 +32,28 @@ docker run -p 8000:8000 \
 **Required environment variables** (set in `backend/.env` or your shell):
 - `GCP_PROJECT_ID` — GCP project ID (required; app fails to start without it)
 - `FIREBASE_STORAGE_BUCKET` — Firebase Storage bucket (required; app fails to start without it)
+- `ALLOWED_ORIGINS` — JSON list (or comma-separated) of permitted CORS origins. Default in code is empty (non-permissive); set this even for local dev.
+- `DOCS_ENABLED` — Set to `true` only in local dev to expose `/docs` and `/redoc`. Default `false` in production.
 
 See `backend/.env.example` for all variables.
+
+## Security Posture
+
+The backend is deployed to Cloud Run with `allUsers` invoker — i.e., the public URL has no auth gate. The frontend is unauthenticated by design (no login). Defenses against cost-runaway abuse of the Gemini-backed endpoints:
+
+- **Per-IP rate limiting** via `slowapi`. Limits keyed off `X-Forwarded-For` (Cloud Run injects it) with a fall-back to `request.client.host`:
+
+  | Endpoint                                | Per minute | Per day |
+  |-----------------------------------------|------------|---------|
+  | `POST /api/v1/study-guides/generate`    | 5          | 30      |
+  | `POST /api/v1/quizzes/generate`         | 5          | 30      |
+  | `POST /api/v1/quizzes/{id}/submit`      | 20         | 200     |
+  | `POST /api/v1/materials/upload`         | 10         | 100     |
+
+  Health, list, and get-by-id endpoints are not rate limited. Limits live in `app/rate_limit.py`.
+- **Docs disabled in production**: `DOCS_ENABLED=false` (default) sets `docs_url`, `redoc_url`, and `openapi_url` to `None`, so the API surface map is not advertised on the public URL.
+- **CORS**: `allowed_origins` defaults to an empty list in code. Production must set `ALLOWED_ORIGINS` explicitly to the prod web app origins.
+- **Budget alert**: a GCP budget alert is configured separately to notify on Vertex AI / Cloud Run spend.
 
 ### Frontend (`frontend/` directory)
 ```bash

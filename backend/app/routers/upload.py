@@ -4,12 +4,13 @@ import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 logger = logging.getLogger(__name__)
 
 from app.dependencies import get_device_id, get_material_processor, get_storage_client
 from app.models.responses import ErrorBody, ErrorDetail, ErrorResponse, MaterialResponse, UploadResponse
+from app.rate_limit import MATERIAL_UPLOAD_LIMITS, limiter
 from app.services.material_processor import FileValidationError, MaterialProcessor
 from app.services.storage_client import StorageClient, StorageError
 
@@ -22,10 +23,13 @@ router = APIRouter()
     status_code=201,
     responses={
         400: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
 )
+@limiter.limit(MATERIAL_UPLOAD_LIMITS)
 async def upload_materials(
+    request: Request,
     files: list[UploadFile] = File(...),
     device_id: str = Depends(get_device_id),
     storage: StorageClient = Depends(get_storage_client),

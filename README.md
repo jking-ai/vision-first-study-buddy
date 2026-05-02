@@ -32,6 +32,7 @@ Students accumulate study materials in many formats -- handwritten lecture notes
 | **Mobile-First Web App** | React + MUI responsive design with camera capture integration for snapping photos of notes directly from the app |
 | **Firebase Integration** | Firebase Storage for file hosting and Firebase Hosting for the frontend SPA |
 | **Prompt Engineering for Extraction** | Crafting prompts that reliably extract structured information (key concepts, definitions, relationships) from messy visual inputs |
+| **Cost-Aware API Hardening** | Per-IP rate limiting (slowapi) on every Vertex AI–backed endpoint, locked-down CORS, and disabled OpenAPI docs in production -- defending an unauthenticated, publicly-invokable Cloud Run service from cost-runaway abuse |
 
 ## Success Criteria
 

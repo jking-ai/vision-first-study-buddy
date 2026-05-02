@@ -2,9 +2,12 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
-from app.routers import health, materials, quizzes, study_guides, upload
 from app.config import get_settings
+from app.rate_limit import limiter, rate_limit_exceeded_handler
+from app.routers import health, materials, quizzes, study_guides, upload
 
 
 def create_app() -> FastAPI:
@@ -15,11 +18,27 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
 
+    # Disable interactive docs unless DOCS_ENABLED=true (default false).
+    # Production should never expose /docs, /redoc, or the OpenAPI schema —
+    # they advertise the API surface to anyone scraping the public URL.
+    docs_kwargs: dict[str, str | None] = (
+        {}
+        if settings.docs_enabled
+        else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    )
+
     app = FastAPI(
         title="Vision-First Study Buddy",
         description="Multimodal study tool that processes handwritten notes, photos, PDFs, and epubs into study guides and quizzes.",
         version="1.0.0",
+        **docs_kwargs,
     )
+
+    # Per-IP rate limiting — defends Gemini-backed endpoints against
+    # cost-runaway abuse. See app/rate_limit.py for the limit table.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

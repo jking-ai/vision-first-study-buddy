@@ -222,6 +222,7 @@ async def test_generate_quiz_calls_generator_with_correct_args():
         num_questions=15,
         difficulty="hard",
         question_types=["multiple_choice", "true_false"],
+        device_id="test-device",
     )
 
 

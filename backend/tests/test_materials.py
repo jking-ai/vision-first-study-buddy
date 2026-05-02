@@ -163,7 +163,7 @@ async def test_get_material_calls_get_material_blobs_with_correct_id():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.get(DETAIL_URL.format(material_id="mat_abc123"))
 
-    mock.get_material_blobs.assert_called_once_with("mat_abc123")
+    mock.get_material_blobs.assert_called_once_with("mat_abc123", "test-device")
 
 
 @pytest.mark.asyncio

@@ -1,10 +1,11 @@
 """Study guides router -- generate and retrieve study guides."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.dependencies import get_device_id, get_study_guide_generator
 from app.models.requests import GenerateStudyGuideRequest
 from app.models.responses import ErrorBody, ErrorResponse, StudyGuide, StudyGuideResponse
+from app.rate_limit import STUDY_GUIDE_GENERATE_LIMITS, limiter
 from app.services.gemini_client import GenerationError, ModelUnavailableError
 from app.services.study_guide_generator import MaterialNotFoundError, StudyGuideGenerator
 
@@ -20,12 +21,15 @@ _study_guides: dict[str, StudyGuide] = {}
     responses={
         400: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
         503: {"model": ErrorResponse},
     },
 )
+@limiter.limit(STUDY_GUIDE_GENERATE_LIMITS)
 async def generate_study_guide(
-    request: GenerateStudyGuideRequest,
+    request: Request,
+    body: GenerateStudyGuideRequest,
     device_id: str = Depends(get_device_id),
     generator: StudyGuideGenerator = Depends(get_study_guide_generator),
 ) -> StudyGuideResponse:
@@ -36,8 +40,9 @@ async def generate_study_guide(
     study guide with sections, key concepts, and definitions.
 
     Args:
-        request: GenerateStudyGuideRequest with material IDs, optional focus topics,
-                 and detail level.
+        request: The raw Starlette/FastAPI request (used by slowapi for IP keying).
+        body: GenerateStudyGuideRequest with material IDs, optional focus topics,
+              and detail level.
         device_id: Device identifier from X-Device-ID header.
         generator: StudyGuideGenerator (injected).
 
@@ -47,14 +52,15 @@ async def generate_study_guide(
     Raises:
         HTTPException 400: If no material IDs are provided (enforced by Pydantic).
         HTTPException 404: If any material ID does not exist in storage.
+        HTTPException 429: If the per-IP rate limit is exceeded.
         HTTPException 500: If Gemini generation fails or returns unparseable output.
         HTTPException 503: If the Gemini model is temporarily unavailable.
     """
     try:
         result = await generator.generate(
-            material_ids=request.material_ids,
-            focus_topics=request.focus_topics,
-            detail_level=request.detail_level,
+            material_ids=body.material_ids,
+            focus_topics=body.focus_topics,
+            detail_level=body.detail_level,
             device_id=device_id,
         )
     except MaterialNotFoundError as exc:

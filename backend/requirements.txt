@@ -2,6 +2,7 @@
 fastapi>=0.115
 uvicorn>=0.34
 python-multipart>=0.0.9
+slowapi>=0.1.9
 
 # Google Cloud / Vertex AI
 google-cloud-aiplatform>=1.60
