@@ -31,15 +31,27 @@ class GeminiClient:
     structured output enforcement via response_mime_type.
     """
 
-    def __init__(self, project_id: str, region: str, model_name: str):
+    def __init__(
+        self,
+        project_id: str,
+        region: str,
+        model_name: str,
+        api_endpoint: Optional[str] = None,
+    ):
         """Initialize the Gemini client.
 
         Args:
             project_id: GCP project ID.
-            region: GCP region (e.g., us-central1).
+            region: Vertex AI location (e.g., global, us-central1).
             model_name: Gemini model name (e.g., gemini-3.1-pro-preview).
+            api_endpoint: Optional Vertex AI host override. Required when
+                region="global" because the default {region}-aiplatform host
+                does not exist for the global endpoint.
         """
-        vertexai.init(project=project_id, location=region)
+        if api_endpoint:
+            vertexai.init(project=project_id, location=region, api_endpoint=api_endpoint)
+        else:
+            vertexai.init(project=project_id, location=region)
         self.project_id = project_id
         self.region = region
         self.model_name = model_name

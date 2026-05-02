@@ -23,18 +23,25 @@ def get_material_processor(settings: Settings = Depends(get_settings)) -> Materi
 
 
 @functools.lru_cache(maxsize=4)
-def _cached_gemini_client(project_id: str, region: str, model_name: str) -> GeminiClient:
-    """Create a GeminiClient and cache it by (project_id, region, model_name).
+def _cached_gemini_client(
+    project_id: str, region: str, model_name: str, api_endpoint: str
+) -> GeminiClient:
+    """Create a GeminiClient and cache it by (project_id, region, model_name, api_endpoint).
 
     vertexai.init() is only called once per unique configuration, not per request.
     Cache size of 4 accommodates test environments that use different settings.
     """
-    return GeminiClient(project_id, region, model_name)
+    return GeminiClient(project_id, region, model_name, api_endpoint=api_endpoint or None)
 
 
 def get_gemini_client(settings: Settings = Depends(get_settings)) -> GeminiClient:
     """Return a cached GeminiClient configured for the current project and model."""
-    return _cached_gemini_client(settings.gcp_project_id, settings.gemini_location, settings.gemini_model)
+    return _cached_gemini_client(
+        settings.gcp_project_id,
+        settings.gemini_location,
+        settings.gemini_model,
+        settings.gemini_api_endpoint,
+    )
 
 
 def get_study_guide_generator(

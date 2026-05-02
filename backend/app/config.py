@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     # Vertex AI / Gemini
     gemini_location: str = "global"
+    gemini_api_endpoint: str = "aiplatform.googleapis.com"
     gemini_model: str = "gemini-3.1-pro-preview"
 
     # Firebase Storage
