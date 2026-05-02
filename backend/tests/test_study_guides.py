@@ -88,7 +88,7 @@ def make_study_guide_response(sg_id: str = "sg_testid1") -> StudyGuideResponse:
     return StudyGuideResponse(
         study_guide=make_study_guide(sg_id),
         metadata=GenerationMetadata(
-            model="gemini-2.5-flash",
+            model="gemini-3.1-pro-preview",
             generation_time_ms=500,
             material_count=1,
             request_id=sg_id,
@@ -175,7 +175,7 @@ class TestStudyGuideGeneratorGenerate:
         file_bytes: bytes = b"fake-image-data",
     ) -> StudyGuideGenerator:
         mock_gemini = AsyncMock(spec=GeminiClient)
-        mock_gemini.model_name = "gemini-2.5-flash"
+        mock_gemini.model_name = "gemini-3.1-pro-preview"
         mock_gemini.generate_multimodal.return_value = gemini_response or GEMINI_RESPONSE
 
         mock_storage = AsyncMock(spec=StorageClient)
@@ -254,14 +254,14 @@ class TestStudyGuideGeneratorGenerate:
             focus_topics=[],
             detail_level=DetailLevel.STANDARD,
         )
-        assert result.metadata.model == "gemini-2.5-flash"
+        assert result.metadata.model == "gemini-3.1-pro-preview"
         assert result.metadata.material_count == 2
         assert result.metadata.request_id == result.study_guide.id
 
     @pytest.mark.asyncio
     async def test_generate_calls_storage_for_each_material(self):
         mock_gemini = AsyncMock(spec=GeminiClient)
-        mock_gemini.model_name = "gemini-2.5-flash"
+        mock_gemini.model_name = "gemini-3.1-pro-preview"
         mock_gemini.generate_multimodal.return_value = GEMINI_RESPONSE
 
         mock_storage = AsyncMock(spec=StorageClient)

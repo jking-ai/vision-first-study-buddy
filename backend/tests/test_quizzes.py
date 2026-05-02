@@ -85,7 +85,7 @@ def make_quiz_response(quiz_id: str = "qz_abc12345") -> QuizResponse:
     return QuizResponse(
         quiz=make_quiz(quiz_id),
         metadata=GenerationMetadata(
-            model="gemini-2.5-flash",
+            model="gemini-3.1-pro-preview",
             generation_time_ms=1200,
             material_count=1,
             request_id="req-test-001",
@@ -184,7 +184,7 @@ async def test_generate_quiz_response_shape():
     assert data["quiz"]["id"].startswith("qz_")
     assert data["quiz"]["title"] == "Biology Quiz"
     assert len(data["quiz"]["questions"]) == 3
-    assert data["metadata"]["model"] == "gemini-2.5-flash"
+    assert data["metadata"]["model"] == "gemini-3.1-pro-preview"
 
 
 @pytest.mark.asyncio
@@ -471,7 +471,7 @@ async def test_submit_quiz_returns_500_on_grading_error():
 @pytest.mark.asyncio
 async def test_grade_mc_correct_exact_match():
     gemini = MagicMock()
-    gemini.model_name = "gemini-2.5-flash"
+    gemini.model_name = "gemini-3.1-pro-preview"
     storage = MagicMock()
     processor = MagicMock()
     generator = QuizGenerator(gemini, storage, processor)
@@ -488,7 +488,7 @@ async def test_grade_mc_correct_exact_match():
 @pytest.mark.asyncio
 async def test_grade_mc_incorrect():
     gemini = MagicMock()
-    gemini.model_name = "gemini-2.5-flash"
+    gemini.model_name = "gemini-3.1-pro-preview"
     generator = QuizGenerator(gemini, MagicMock(), MagicMock())
 
     quiz = make_quiz()
@@ -503,7 +503,7 @@ async def test_grade_mc_incorrect():
 @pytest.mark.asyncio
 async def test_grade_mc_case_insensitive():
     gemini = MagicMock()
-    gemini.model_name = "gemini-2.5-flash"
+    gemini.model_name = "gemini-3.1-pro-preview"
     generator = QuizGenerator(gemini, MagicMock(), MagicMock())
 
     quiz = make_quiz()
@@ -517,7 +517,7 @@ async def test_grade_mc_case_insensitive():
 @pytest.mark.asyncio
 async def test_grade_tf_correct():
     gemini = MagicMock()
-    gemini.model_name = "gemini-2.5-flash"
+    gemini.model_name = "gemini-3.1-pro-preview"
     generator = QuizGenerator(gemini, MagicMock(), MagicMock())
 
     quiz = make_quiz()
@@ -531,7 +531,7 @@ async def test_grade_tf_correct():
 @pytest.mark.asyncio
 async def test_grade_short_answer_calls_gemini():
     gemini = AsyncMock()
-    gemini.model_name = "gemini-2.5-flash"
+    gemini.model_name = "gemini-3.1-pro-preview"
     gemini.grade_short_answer = AsyncMock(
         return_value={"is_correct": True, "explanation": "Correct — mitochondria produce ATP."}
     )
@@ -550,7 +550,7 @@ async def test_grade_short_answer_calls_gemini():
 @pytest.mark.asyncio
 async def test_grade_submission_score_percentage():
     gemini = MagicMock()
-    gemini.model_name = "gemini-2.5-flash"
+    gemini.model_name = "gemini-3.1-pro-preview"
     generator = QuizGenerator(gemini, MagicMock(), MagicMock())
 
     quiz = make_quiz()

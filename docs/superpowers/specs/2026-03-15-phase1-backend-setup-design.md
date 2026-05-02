@@ -71,6 +71,6 @@ Refactor from class-based tests to function-based tests with pytest fixtures:
 ## Success Criteria
 
 1. `uvicorn app.main:app --reload` starts without errors when `.env` has required variables set
-2. `GET /api/v1/health` returns `{"status":"healthy","service":"vision-first-study-buddy","version":"1.0.0","model":"gemini-2.5-flash","storage_bucket":"..."}`
+2. `GET /api/v1/health` returns `{"status":"healthy","service":"vision-first-study-buddy","version":"1.0.0","model":"gemini-3.1-pro-preview","storage_bucket":"..."}`
 3. Starting without `GCP_PROJECT_ID` or `FIREBASE_STORAGE_BUCKET` raises a clear `ValueError` listing all missing fields
 4. `pytest` passes all 11 tests covering config validation, health endpoint shape, and CORS headers

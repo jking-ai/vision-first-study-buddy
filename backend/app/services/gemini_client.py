@@ -25,7 +25,7 @@ class ModelUnavailableError(GenerationError):
 
 
 class GeminiClient:
-    """Client for Vertex AI Gemini 2.5 Flash multimodal generation.
+    """Client for Vertex AI Gemini multimodal generation.
 
     Handles SDK initialization, multimodal content assembly, and
     structured output enforcement via response_mime_type.
@@ -37,7 +37,7 @@ class GeminiClient:
         Args:
             project_id: GCP project ID.
             region: GCP region (e.g., us-central1).
-            model_name: Gemini model name (e.g., gemini-2.5-flash).
+            model_name: Gemini model name (e.g., gemini-3.1-pro-preview).
         """
         vertexai.init(project=project_id, location=region)
         self.project_id = project_id

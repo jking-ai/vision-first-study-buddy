@@ -13,7 +13,7 @@ How to deploy and operate the application on Google Cloud Platform.
 | Backend URL | Cloud Run | `https://<your-cloud-run-url>` |
 | Frontend | Firebase Hosting | `https://<your-firebase-site>.web.app` |
 | Frontend (alt) | Firebase Hosting | `https://<your-firebase-site>.firebaseapp.com` |
-| LLM | Vertex AI | Gemini 2.5 Flash (`gemini-2.5-flash`) |
+| LLM | Vertex AI | Gemini 3.1 Pro Preview (`gemini-3.1-pro-preview`) |
 | File Storage | Firebase Storage | Bucket: `<your-storage-bucket>` |
 | Container Registry | Artifact Registry | `us-central1-docker.pkg.dev/<your-gcp-project>/cloud-run-source-deploy` |
 

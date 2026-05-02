@@ -4,11 +4,11 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## Project Overview
 
-Vision-First Study Buddy is a multimodal study tool that consumes hand-written notes, whiteboard photos, PDFs, and epubs to generate personalized study guides and quizzes. It leverages Gemini 2.5 Flash's native vision capabilities and massive context window to process messy, real-world student materials without requiring manual transcription.
+Vision-First Study Buddy is a multimodal study tool that consumes hand-written notes, whiteboard photos, PDFs, and epubs to generate personalized study guides and quizzes. It leverages Gemini 3.1 Pro's native vision capabilities and massive context window to process messy, real-world student materials without requiring manual transcription.
 
 - **Backend:** FastAPI 0.115+ (Python 3.12) on Cloud Run
 - **Frontend:** React 19 + MUI (Material UI) + Vite on Firebase Hosting
-- **LLM:** Vertex AI Gemini 2.5 Flash via `google-cloud-aiplatform` SDK (native multimodal + 1M token context)
+- **LLM:** Vertex AI Gemini 3.1 Pro (preview) via `google-cloud-aiplatform` SDK (native multimodal + 1M token context)
 - **Storage:** Firebase Storage for uploaded images, PDFs, and epubs
 - **Data:** No database -- uploaded materials are stored in Firebase Storage; generated content is returned directly to the client
 
@@ -71,10 +71,10 @@ firebase deploy --only hosting:study-buddy --project <your-gcp-project>
 ## Architecture
 
 ### Request Flow
-`Browser (mobile/desktop)` -> `Firebase Hosting (React + MUI SPA)` -> `FastAPI (Cloud Run)` -> `Firebase Storage (file hosting)` + `Vertex AI Gemini 2.5 Flash (multimodal processing)` -> Structured JSON response -> `Frontend renders study guide / quiz`
+`Browser (mobile/desktop)` -> `Firebase Hosting (React + MUI SPA)` -> `FastAPI (Cloud Run)` -> `Firebase Storage (file hosting)` + `Vertex AI Gemini 3.1 Pro (multimodal processing)` -> Structured JSON response -> `Frontend renders study guide / quiz`
 
 ### Key Design Decisions
-- **Multimodal input:** Sends images and PDFs directly to Gemini 2.5 Flash as multimodal content parts. No separate OCR pipeline -- Gemini handles text extraction, diagram recognition, and content understanding in a single pass.
+- **Multimodal input:** Sends images and PDFs directly to Gemini 3.1 Pro as multimodal content parts. No separate OCR pipeline -- Gemini handles text extraction, diagram recognition, and content understanding in a single pass.
 - **Long-context processing:** Leverages Gemini's 1M token context window to process multiple uploaded materials simultaneously, avoiding the complexity of chunking or vector-based RAG.
 - **Firebase Storage:** Uploaded files are stored in Firebase Storage buckets, providing CDN-backed access and persistent URLs that can be passed to the Gemini API.
 - **Mobile-first camera capture:** The frontend integrates with the device camera via the MediaDevices API, allowing students to snap photos of notes directly within the app.
@@ -98,7 +98,7 @@ cp backend/.env.example backend/.env
 # Required variables:
 #   GCP_PROJECT_ID=<your-gcp-project>
 #   GCP_REGION=us-central1 (default)
-#   GEMINI_MODEL=gemini-2.5-flash (default)
+#   GEMINI_MODEL=gemini-3.1-pro-preview (default)
 #   FIREBASE_STORAGE_BUCKET=<your-storage-bucket>
 ```
 

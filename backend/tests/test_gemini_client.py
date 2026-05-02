@@ -24,7 +24,7 @@ from app.services.gemini_client import (
 def _make_client(
     project_id: str = "test-project",
     region: str = "us-central1",
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-3.1-pro-preview",
 ) -> GeminiClient:
     with patch("app.services.gemini_client.vertexai"):
         return GeminiClient(project_id=project_id, region=region, model_name=model_name)
@@ -43,7 +43,7 @@ def _make_mock_response(data: dict) -> MagicMock:
 
 def test_init_calls_vertexai_init():
     with patch("app.services.gemini_client.vertexai") as mock_vtx:
-        GeminiClient(project_id="proj", region="us-east1", model_name="gemini-2.5-flash")
+        GeminiClient(project_id="proj", region="us-east1", model_name="gemini-3.1-pro-preview")
         mock_vtx.init.assert_called_once_with(project="proj", location="us-east1")
 
 

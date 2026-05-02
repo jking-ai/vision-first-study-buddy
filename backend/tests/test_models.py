@@ -327,12 +327,12 @@ class TestStudyGuide:
 class TestGenerationMetadata:
     def test_valid(self):
         meta = GenerationMetadata(
-            model="gemini-2.5-flash",
+            model="gemini-3.1-pro-preview",
             generation_time_ms=1234,
             material_count=3,
             request_id="req_abc",
         )
-        assert meta.model == "gemini-2.5-flash"
+        assert meta.model == "gemini-3.1-pro-preview"
         assert meta.generation_time_ms == 1234
 
 
@@ -494,7 +494,7 @@ class TestHealthResponse:
             status="ok",
             service="vision-first-study-buddy",
             version="0.1.0",
-            model="gemini-2.5-flash",
+            model="gemini-3.1-pro-preview",
             storage_bucket="my-bucket.appspot.com",
         )
         assert h.status == "ok"

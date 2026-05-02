@@ -32,7 +32,7 @@ async def generate_study_guide(
     """Generate a study guide from one or more uploaded materials.
 
     Fetches the specified materials from Firebase Storage, sends them
-    as multimodal content to Gemini 2.5 Flash, and returns a structured
+    as multimodal content to Gemini 3.1 Pro, and returns a structured
     study guide with sections, key concepts, and definitions.
 
     Args:

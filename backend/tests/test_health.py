@@ -25,7 +25,7 @@ def make_settings(**kwargs) -> Settings:
 @pytest.fixture
 def test_settings() -> Settings:
     return make_settings(
-        gemini_model="gemini-2.5-flash",
+        gemini_model="gemini-3.1-pro-preview",
         firebase_storage_bucket="my-project.appspot.com",
     )
 
@@ -86,7 +86,7 @@ def test_settings_allowed_origins_list():
 
 def test_settings_defaults_are_sensible():
     s = make_settings()
-    assert s.gemini_model == "gemini-2.5-flash"
+    assert s.gemini_model == "gemini-3.1-pro-preview"
     assert s.gcp_region == "us-central1"
     assert s.max_file_size_mb == 20
 

@@ -14,7 +14,7 @@
 - [ ] Python 3.12 project initialized with `requirements.txt` containing: `fastapi>=0.115`, `uvicorn`, `google-cloud-aiplatform`, `google-cloud-storage`, `firebase-admin`, `python-multipart`, `pydantic>=2.0`, `pydantic-settings>=2.0`, `python-dotenv`, `pytest`, `httpx`
 - [ ] `Dockerfile` builds and runs locally with `docker build -t vfsb-backend . && docker run -p 8000:8000 vfsb-backend`
 - [ ] `app/main.py` creates a FastAPI app instance with CORS middleware configured for `localhost:5173` and a placeholder production origin
-- [ ] `app/config.py` loads settings from environment variables: `GCP_PROJECT_ID`, `GCP_REGION` (default: `us-central1`), `GEMINI_MODEL` (default: `gemini-2.5-flash`), `FIREBASE_STORAGE_BUCKET`
+- [ ] `app/config.py` loads settings from environment variables: `GCP_PROJECT_ID`, `GCP_REGION` (default: `us-central1`), `GEMINI_MODEL` (default: `gemini-3.1-pro-preview`), `FIREBASE_STORAGE_BUCKET`
 - [ ] `GET /api/v1/health` returns the health response JSON as defined in api-contracts.md
 - [ ] Running `uvicorn app.main:app --reload` starts the server without errors
 
@@ -32,7 +32,7 @@
 
 **Acceptance criteria:**
 - [ ] `app/services/gemini_client.py` initializes the Vertex AI SDK configured for the project and region from config
-- [ ] A standalone test script (`scripts/test_gemini_multimodal.py`) sends a handwritten notes image to Gemini 2.5 Flash and prints the extracted text, confirming multimodal authentication works
+- [ ] A standalone test script (`scripts/test_gemini_multimodal.py`) sends a handwritten notes image to Gemini 3.1 Pro and prints the extracted text, confirming multimodal authentication works
 - [ ] The client supports sending multiple content parts (images + text instructions) in a single call
 - [ ] The client supports passing `response_mime_type="application/json"` for structured output
 - [ ] Error handling wraps SDK exceptions and raises a custom `GenerationError` with the original error message

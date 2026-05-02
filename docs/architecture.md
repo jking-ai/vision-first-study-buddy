@@ -19,7 +19,7 @@ graph TB
     end
 
     subgraph "Vertex AI"
-        Gemini["Gemini 2.5 Flash<br/>Multimodal Processing"]
+        Gemini["Gemini 3.1 Pro<br/>Multimodal Processing"]
     end
 
     User -->|"HTTPS"| FE
@@ -59,7 +59,7 @@ sequenceDiagram
     participant FE as React Frontend
     participant API as FastAPI (Cloud Run)
     participant FS as Firebase Storage
-    participant LLM as Gemini 2.5 Flash
+    participant LLM as Gemini 3.1 Pro
 
     U->>FE: Select materials and click "Generate Study Guide"
     FE->>API: POST /api/v1/study-guides/generate
@@ -81,7 +81,7 @@ sequenceDiagram
     participant FE as React Frontend
     participant API as FastAPI (Cloud Run)
     participant FS as Firebase Storage
-    participant LLM as Gemini 2.5 Flash
+    participant LLM as Gemini 3.1 Pro
 
     U->>FE: Select materials and click "Generate Quiz"
     FE->>API: POST /api/v1/quizzes/generate
@@ -107,7 +107,7 @@ sequenceDiagram
 | **Backend API** | FastAPI | 0.115+ | Async-first Python framework with built-in OpenAPI docs, Pydantic integration, and native multipart file upload support |
 | **Runtime** | Python | 3.12 | Stable release with full ecosystem support for google-cloud-aiplatform and firebase-admin SDKs |
 | **LLM Access** | Vertex AI SDK (`google-cloud-aiplatform`) | latest | Official Google SDK for Vertex AI with native support for multimodal content (images, PDFs) and structured output |
-| **LLM Model** | Gemini 2.5 Flash | `gemini-2.5-flash` | Native multimodal understanding (images, PDFs); 1M token context window enables processing multiple documents without chunking; fast inference and low cost |
+| **LLM Model** | Gemini 3.1 Pro | `gemini-3.1-pro-preview` | Native multimodal understanding (images, PDFs); 1M token context window enables processing multiple documents without chunking; stronger reasoning for messy handwriting, layout interpretation, and structured output |
 | **File Storage** | Firebase Storage | N/A | CDN-backed object storage with simple upload/download APIs; integrates with Firebase Admin SDK for server-side access |
 | **Frontend** | React | 19.x | Component-based UI with hooks for state management; broad ecosystem for camera/file APIs |
 | **UI Framework** | MUI (Material UI) | 6.x | Pre-built accessible components (cards, buttons, dialogs, file inputs); responsive grid system for mobile-first design; built-in dark mode support |
@@ -121,9 +121,9 @@ sequenceDiagram
 
 ### 1. Gemini Native Vision vs. Separate OCR Pipeline
 
-**Decision:** Use Gemini 2.5 Flash's built-in multimodal understanding instead of a dedicated OCR service (e.g., Google Cloud Vision API, Tesseract).
+**Decision:** Use Gemini 3.1 Pro's built-in multimodal understanding instead of a dedicated OCR service (e.g., Google Cloud Vision API, Tesseract).
 
-**Rationale:** Gemini 2.5 Flash natively accepts images and PDFs as input content parts. Rather than running OCR to extract text and then sending that text to an LLM, we send the raw images directly. This has several advantages: (a) Gemini understands spatial layout, diagrams, and annotations that pure OCR would lose, (b) fewer services to manage and pay for, (c) the model can reason about visual elements (arrows, underlines, diagrams) alongside text. The trade-off is that Gemini's text extraction may be less precise than dedicated OCR for very messy handwriting, but the holistic understanding compensates.
+**Rationale:** Gemini 3.1 Pro natively accepts images and PDFs as input content parts. Rather than running OCR to extract text and then sending that text to an LLM, we send the raw images directly. This has several advantages: (a) Gemini understands spatial layout, diagrams, and annotations that pure OCR would lose, (b) fewer services to manage and pay for, (c) the model can reason about visual elements (arrows, underlines, diagrams) alongside text. The trade-off is that Gemini's text extraction may be less precise than dedicated OCR for very messy handwriting, but the holistic understanding compensates.
 
 ### 2. Long-Context Processing vs. RAG
 
@@ -153,7 +153,7 @@ sequenceDiagram
 
 **Decision:** Study guide and quiz generation are synchronous API calls rather than async jobs with polling.
 
-**Rationale:** Gemini 2.5 Flash is fast (typically 5-15 seconds for study guide generation). A synchronous request-response pattern is simpler to implement and test. The frontend shows a loading state during generation. If generation times increase (e.g., processing very large document sets), the architecture can be extended to use Cloud Tasks or Pub/Sub for async processing without changing the API contract.
+**Rationale:** Generation completes in a single request-response cycle, which is simpler to implement and test. The frontend shows a loading state during generation. Gemini 3.1 Pro is slower than the Flash tier in exchange for stronger reasoning on handwriting and structured output; if generation times grow further (e.g., processing very large document sets), the architecture can be extended to use Cloud Tasks or Pub/Sub for async processing without changing the API contract.
 
 ## Project Source Code Structure
 

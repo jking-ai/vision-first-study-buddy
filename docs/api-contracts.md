@@ -84,7 +84,7 @@ curl http://localhost:8000/api/v1/health
   "status": "healthy",
   "service": "vision-first-study-buddy",
   "version": "1.0.0",
-  "model": "gemini-2.5-flash",
+  "model": "gemini-3.1-pro-preview",
   "storage_bucket": "my-project.appspot.com"
 }
 ```
@@ -305,7 +305,7 @@ curl -X POST http://localhost:8000/api/v1/study-guides/generate \
     "generated_at": "2026-02-27T10:35:00Z"
   },
   "metadata": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3.1-pro-preview",
     "generation_time_ms": 8750,
     "material_count": 2,
     "request_id": "req_p1q2r3s4t5u6"
@@ -427,7 +427,7 @@ curl -X POST http://localhost:8000/api/v1/quizzes/generate \
     "generated_at": "2026-02-27T10:40:00Z"
   },
   "metadata": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3.1-pro-preview",
     "generation_time_ms": 6200,
     "material_count": 2,
     "request_id": "req_v1w2x3y4z5a6"

@@ -25,7 +25,7 @@ Students accumulate study materials in many formats -- handwritten lecture notes
 | Pattern | Description |
 |---------|-------------|
 | **Multimodal Computer Vision** | Processing handwritten notes, whiteboard photos, and diagrams through Gemini's native image understanding -- a high-value enterprise skill applicable to digitizing paper forms, technical blueprints, and medical records |
-| **Long-Context Document Processing** | Leveraging Gemini 2.5 Flash's 1M token context window to process multiple documents simultaneously without chunking or traditional RAG pipelines |
+| **Long-Context Document Processing** | Leveraging Gemini 3.1 Pro's 1M token context window to process multiple documents simultaneously without chunking or traditional RAG pipelines |
 | **File Upload Pipeline** | Handling multipart file uploads (images, PDFs, epubs) with Firebase Storage integration for persistent, CDN-backed storage |
 | **Asynchronous Processing** | Managing long-running LLM generation tasks with status tracking and polling |
 | **FastAPI Backend Design** | Clean REST API with Pydantic models, file upload handling, and proper error responses |
