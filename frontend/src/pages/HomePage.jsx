@@ -47,7 +47,7 @@ function HomePage() {
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 600, mx: "auto" }}>
           Upload your notes, whiteboard photos, PDFs, and epubs — then generate
-          personalized study guides and quizzes powered by Gemini 2.5 Flash.
+          personalized study guides and quizzes powered by Gemini 3.1 Pro.
         </Typography>
         <Button
           variant="contained"
