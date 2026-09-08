@@ -28,7 +28,9 @@ PROMPT_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "voice_coach_t
 
 # Sent to the coach after the pause that follows its feedback on an answer.
 NEXT_QUESTION_PROMPT = (
-    "Continue: ask the next question now. If you already asked it, repeat it briefly."
+    "Continue. If you have not yet spoken your feedback on the student's last answer, "
+    "say it now, starting with a clear verdict. Then ask the next question. "
+    "If you already asked it, repeat it briefly."
 )
 
 

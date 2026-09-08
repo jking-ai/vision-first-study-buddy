@@ -89,7 +89,7 @@ def get_live_tools_config() -> list[dict[str, Any]]:
                     "name": "record_answer",
                     "description": (
                         "Record the student's answer to the question just asked. "
-                        "Call exactly once per question, right after the student answers."
+                        "Call exactly once per question, after you have spoken your feedback out loud."
                     ),
                     "parameters": {
                         "type": "OBJECT",
