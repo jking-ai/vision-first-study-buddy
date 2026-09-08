@@ -10,6 +10,9 @@ import {
 } from "../utils/voiceProtocol";
 import { saveQuizResult } from "../utils/quizHistory";
 
+// Upper bound on how long queued coach audio may keep playing after the session ends.
+const MAX_DRAIN_MS = 20000;
+
 export function useVoiceSession({ studyGuide, voice } = {}) {
   const [sessionState, setSessionState] = useState(initialVoiceState);
   const [status, setStatus] = useState(null);
@@ -27,6 +30,7 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
   const audioSampleBufferRef = useRef([]);
   const studyGuideRef = useRef(studyGuide);
   const sessionStateRef = useRef(sessionState);
+  const pendingEndedRef = useRef(null);
 
   studyGuideRef.current = studyGuide;
   sessionStateRef.current = sessionState;
@@ -45,14 +49,32 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
     refreshStatus();
   }, [refreshStatus]);
 
-  const cleanupAudio = useCallback(() => {
-    // Stop playing sources
-    activeSourcesRef.current.forEach((src) => {
-      try {
-        src.stop();
-      } catch {}
-    });
-    activeSourcesRef.current = [];
+  /**
+   * Release mic and audio resources.
+   *
+   * With `drainPlayback`, audio the coach has already sent keeps playing until
+   * the queue is empty (bounded by MAX_DRAIN_MS) instead of being cut off.
+   * Returns the number of milliseconds of playback still queued.
+   */
+  const cleanupAudio = useCallback(({ drainPlayback = false } = {}) => {
+    const playback = playbackContextRef.current;
+    let remainingMs = 0;
+    if (drainPlayback && playback && playback.state !== "closed") {
+      remainingMs = Math.max(
+        0,
+        Math.min(MAX_DRAIN_MS, (nextStartTimeRef.current - playback.currentTime) * 1000)
+      );
+    }
+
+    if (!drainPlayback) {
+      // Stop playing sources
+      activeSourcesRef.current.forEach((src) => {
+        try {
+          src.stop();
+        } catch {}
+      });
+      activeSourcesRef.current = [];
+    }
 
     // Stop mic stream
     if (micStreamRef.current) {
@@ -71,10 +93,19 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
       captureContextRef.current.close().catch(() => {});
       captureContextRef.current = null;
     }
-    if (playbackContextRef.current && playbackContextRef.current.state !== "closed") {
-      playbackContextRef.current.close().catch(() => {});
+    if (playback && playback.state !== "closed") {
       playbackContextRef.current = null;
+      const closePlayback = () => {
+        activeSourcesRef.current = [];
+        playback.close().catch(() => {});
+      };
+      if (remainingMs > 0) {
+        setTimeout(closePlayback, remainingMs + 100);
+      } else {
+        closePlayback();
+      }
     }
+    return remainingMs;
   }, []);
 
   const end = useCallback(() => {
@@ -88,6 +119,7 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
   const pressTalk = useCallback(() => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     if (isTalkingRef.current) return;
+    if (sessionStateRef.current.inputLocked) return;
 
     // Resume playback context if needed
     if (playbackContextRef.current?.state === "suspended") {
@@ -259,6 +291,14 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
             nextStartTimeRef.current = playbackContextRef.current?.currentTime || 0;
           }
 
+          if (msg.type === "ended") {
+            // Lock input now, but keep the live view up until the coach's
+            // queued audio has finished playing.
+            setSessionState((prev) => ({ ...prev, inputLocked: true }));
+            pendingEndedRef.current = msg;
+            return;
+          }
+
           setSessionState((prev) => {
             const next = reduceVoiceMessage(prev, msg);
             if (msg.type === "quiz_summary" && studyGuideRef.current) {
@@ -272,10 +312,10 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
       };
 
       ws.onclose = (event) => {
-        cleanupAudio();
         refreshStatus();
 
         if (event.code !== 1000) {
+          cleanupAudio();
           setSessionState((prev) => ({
             ...prev,
             state: "error",
@@ -284,12 +324,19 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
               message: getVoiceErrorMessage(event.code),
             },
           }));
+          return;
+        }
+
+        const endedMsg = pendingEndedRef.current || { type: "ended", reason: "client_end" };
+        pendingEndedRef.current = null;
+        const remainingMs = cleanupAudio({ drainPlayback: true });
+        const finish = () => {
+          setSessionState((prev) => reduceVoiceMessage(prev, endedMsg));
+        };
+        if (remainingMs > 0) {
+          setTimeout(finish, remainingMs);
         } else {
-          setSessionState((prev) => ({
-            ...prev,
-            state: "ended",
-            endedReason: prev.endedReason || "client_end",
-          }));
+          finish();
         }
       };
 
@@ -326,13 +373,13 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
     const timer = setInterval(() => {
       setSessionState((prev) => {
         if (prev.secondsLeft === null || prev.secondsLeft <= 1) {
+          // Time is up for the student. The server locks input and lets the
+          // coach finish its turn before sending "ended".
           clearInterval(timer);
-          end();
           return {
             ...prev,
             secondsLeft: 0,
-            state: "ended",
-            endedReason: prev.endedReason || "max_duration",
+            inputLocked: true,
           };
         }
         return {
@@ -343,7 +390,7 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [sessionState.state, sessionState.secondsLeft, end]);
+  }, [sessionState.state, sessionState.secondsLeft]);
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -355,6 +402,13 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
     };
   }, [cleanupAudio]);
 
+  // If time runs out mid-answer, finish the utterance so the coach can respond.
+  useEffect(() => {
+    if (sessionState.inputLocked && isTalkingRef.current) {
+      releaseTalk();
+    }
+  }, [sessionState.inputLocked, releaseTalk]);
+
   const effectiveState = isTalking ? "talking" : sessionState.state;
 
   return {
@@ -362,6 +416,7 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
     status,
     transcript: sessionState.transcript,
     secondsLeft: sessionState.secondsLeft,
+    inputLocked: sessionState.inputLocked,
     error: sessionState.error,
     endedReason: sessionState.endedReason,
     answers: sessionState.answers,

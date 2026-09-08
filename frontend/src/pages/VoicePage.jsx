@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Container,
@@ -58,6 +58,7 @@ export function VoicePage() {
     status,
     transcript,
     secondsLeft,
+    inputLocked,
     error,
     endedReason,
     answers,
@@ -74,6 +75,19 @@ export function VoicePage() {
   const isEnabled = status?.enabled ?? false;
   const canStartSession = isEnabled && remainingToday > 0 && !!activeStudyGuide;
   const isLive = state === "ready" || state === "talking";
+  const resultsRef = useRef(null);
+
+  // The live view leaves the page scrolled to the last message; bring the
+  // results into view when the session ends.
+  useEffect(() => {
+    if (state === "ended") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [state]);
+
+  const scrollToResults = () => {
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const endedReasonText = useMemo(() => {
     switch (endedReason) {
@@ -153,8 +167,8 @@ export function VoicePage() {
             </Box>
             <Chip
               icon={<GraphicEqIcon />}
-              label={state === "talking" ? "Listening" : "Live"}
-              color={state === "talking" ? "secondary" : "success"}
+              label={inputLocked ? "Wrapping up" : state === "talking" ? "Listening" : "Live"}
+              color={inputLocked ? "warning" : state === "talking" ? "secondary" : "success"}
               variant="outlined"
               sx={{ fontWeight: 600, flexShrink: 0 }}
             />
@@ -177,6 +191,7 @@ export function VoicePage() {
         <VoiceControls
           state={state}
           secondsLeft={secondsLeft}
+          disabled={inputLocked}
           onPressTalk={pressTalk}
           onReleaseTalk={releaseTalk}
           onEndSession={end}
@@ -285,17 +300,34 @@ export function VoicePage() {
         {/* State: Ended */}
         {state === "ended" && (
           <Box>
-            <Alert severity="success" sx={{ mb: 3 }}>
+            <Alert
+              severity="success"
+              sx={{ mb: 3, alignItems: "center" }}
+              action={
+                (score || answers.length > 0 || quizSummary) && (
+                  <Button color="inherit" size="small" onClick={scrollToResults}>
+                    View results
+                  </Button>
+                )
+              }
+            >
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                 {endedReasonText}
               </Typography>
+              {score && (
+                <Typography variant="body2">
+                  You scored {score.correct} of {score.total}.
+                </Typography>
+              )}
             </Alert>
 
-            <VoiceScorePanel
-              score={score}
-              answers={answers}
-              quizSummary={quizSummary}
-            />
+            <Box ref={resultsRef} sx={{ scrollMarginTop: 80 }}>
+              <VoiceScorePanel
+                score={score}
+                answers={answers}
+                quizSummary={quizSummary}
+              />
+            </Box>
 
             <Typography variant="subtitle2" sx={{ mb: 1.5, mt: 3 }}>
               Session transcript

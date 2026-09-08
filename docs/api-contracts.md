@@ -776,6 +776,7 @@ Bidirectional WebSocket connection for live interactive voice coaching and oral 
 | binary | raw PCM16 LE, 24 kHz, mono | Spoken audio chunks from coach. |
 | text | `{"type":"transcript","role":"user"\|"coach","text":"<string>"}` | Real-time transcription chunks. |
 | text | `{"type":"turn_complete"}` | Coach finished speaking a turn. |
+| text | `{"type":"time_up","grace_s":30}` | Session time limit reached. Client input is locked from here on; the coach may finish its current turn for up to `grace_s` seconds, then `ended` follows with reason `max_duration`. |
 | text | `{"type":"interrupted"}` | Coach turn interrupted by user. |
 | text | `{"type":"answer_recorded","index":<1-based>,"question":"<string>","student_answer":"<string>","correct":<bool>,"feedback":"<string>","score":{"correct":<int>,"total":<int>}}` | Answer recorded during oral quiz. |
 | text | `{"type":"quiz_summary","summary":"<string>","score":{"correct":<int>,"asked":<int>,"total":<int>}}` | Final summary and score after last question. |
@@ -794,6 +795,8 @@ Bidirectional WebSocket connection for live interactive voice coaching and oral 
 | 4408 | `START_TIMEOUT` | No `start` frame within timeout. |
 | 4429 | `DEVICE_DAILY_LIMIT`, `GLOBAL_DAILY_LIMIT`, `CONCURRENT_LIMIT`, `AUDIO_QUOTA_EXCEEDED` | Session or rate cap hit. |
 | 4503 | `VOICE_DISABLED` | Feature flag `VOICE_ENABLED` is false. |
+
+**Pacing:** after the coach records an answer and finishes its feedback turn, the server waits `VOICE_NEXT_QUESTION_PAUSE_SECONDS` (default 2.5) and then prompts the coach to ask the next question. A `speech_start` during the pause cancels the prompt.
 
 **Live API Tool Declarations:**
 - `record_answer`: parameters `question` (str), `student_answer` (str), `correct` (bool), `feedback` (str).

@@ -441,10 +441,187 @@ def test_max_duration_ends_session(
         ws.send_json({"type": "start", "device_id": "dev-timer", "study_guide": sample_study_guide})
         assert ws.receive_json()["type"] == "ready"
 
-        # Wait for max duration watchdog to fire
+        # Wait for max duration watchdog to fire: input locks, then the
+        # session ends at once because the coach is idle.
+        time_up = ws.receive_json()
+        assert time_up["type"] == "time_up"
         ended = ws.receive_json()
         assert ended["type"] == "ended"
         assert ended["reason"] == "max_duration"
+
+
+def test_time_up_waits_for_coach_to_finish_turn(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    """After the limit, the coach's in-progress turn is relayed until turn_complete."""
+    voice_enabled_settings.voice_session_max_seconds = 1
+    voice_enabled_settings.voice_end_grace_seconds = 10
+    audio_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(
+            model_turn=types.Content(
+                parts=[types.Part(inline_data=types.Blob(data=b"\x00" * 480, mime_type="audio/pcm"))]
+            )
+        )
+    )
+    turn_complete_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(turn_complete=True)
+    )
+    # Audio arrives before the limit; turn_complete is queued after time_up.
+    fake_live = FakeLiveClient([audio_msg])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-grace", "study_guide": sample_study_guide})
+        assert ws.receive_json()["type"] == "ready"
+        assert ws.receive_bytes() == b"\x00" * 480
+
+        time_up = ws.receive_json()
+        assert time_up["type"] == "time_up"
+        assert time_up["grace_s"] == 10
+
+        # Input is locked: speech_start must not reach the Live session.
+        ws.send_json({"type": "speech_start"})
+        ws.send_bytes(b"\x01" * 320)
+
+        # The coach finishes its turn, and only then does the session end.
+        assert fake_live.current_session is not None
+        fake_live.current_session.incoming_queue.put_nowait(turn_complete_msg)
+        assert ws.receive_json()["type"] == "turn_complete"
+        ended = ws.receive_json()
+        assert ended["type"] == "ended"
+        assert ended["reason"] == "max_duration"
+
+        starts = [i for i in fake_live.current_session.sent_realtime_inputs if i["activity_start"]]
+        audio = [i for i in fake_live.current_session.sent_realtime_inputs if i["audio"]]
+        assert starts == []
+        assert audio == []
+
+
+def test_time_up_grace_deadline_ends_session(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    """If the coach never completes its turn, the grace window ends the session."""
+    voice_enabled_settings.voice_session_max_seconds = 1
+    voice_enabled_settings.voice_end_grace_seconds = 1
+    audio_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(
+            model_turn=types.Content(
+                parts=[types.Part(inline_data=types.Blob(data=b"\x00" * 480, mime_type="audio/pcm"))]
+            )
+        )
+    )
+    fake_live = FakeLiveClient([audio_msg])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-grace2", "study_guide": sample_study_guide})
+        assert ws.receive_json()["type"] == "ready"
+        ws.receive_bytes()
+        assert ws.receive_json()["type"] == "time_up"
+        ended = ws.receive_json()
+        assert ended["type"] == "ended"
+        assert ended["reason"] == "max_duration"
+
+
+def test_next_question_nudge_after_answer_turn(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    """After feedback on an answer, the coach is prompted to continue after a pause."""
+    voice_enabled_settings.voice_next_question_pause_seconds = 0.05
+    tool_msg = types.LiveServerMessage(
+        tool_call=types.LiveServerToolCall(
+            function_calls=[
+                types.FunctionCall(
+                    id="call_rec_n",
+                    name="record_answer",
+                    args={
+                        "question": "Q1?",
+                        "student_answer": "A1",
+                        "correct": True,
+                        "feedback": "Right.",
+                    },
+                )
+            ]
+        )
+    )
+    turn_complete_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(turn_complete=True)
+    )
+    fake_live = FakeLiveClient([tool_msg, turn_complete_msg])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-nudge", "study_guide": sample_study_guide})
+        assert ws.receive_json()["type"] == "ready"
+        assert ws.receive_json()["type"] == "answer_recorded"
+        assert ws.receive_json()["type"] == "turn_complete"
+
+        import time as _time
+
+        deadline = _time.monotonic() + 2.0
+        session = fake_live.current_session
+        assert session is not None
+        while _time.monotonic() < deadline and len(session.sent_inputs) < 2:
+            _time.sleep(0.02)
+        # First input is the kickoff prompt; second is the nudge.
+        assert len(session.sent_inputs) == 2
+        assert "next question" in session.sent_inputs[1]["input"]
+
+        ws.send_json({"type": "end"})
+        ws.receive_json()
+
+
+def test_nudge_cancelled_when_student_starts_speaking(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    voice_enabled_settings.voice_next_question_pause_seconds = 0.3
+    tool_msg = types.LiveServerMessage(
+        tool_call=types.LiveServerToolCall(
+            function_calls=[
+                types.FunctionCall(
+                    id="call_rec_c",
+                    name="record_answer",
+                    args={
+                        "question": "Q1?",
+                        "student_answer": "A1",
+                        "correct": False,
+                        "feedback": "Not quite.",
+                    },
+                )
+            ]
+        )
+    )
+    turn_complete_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(turn_complete=True)
+    )
+    fake_live = FakeLiveClient([tool_msg, turn_complete_msg])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-nudge-cancel", "study_guide": sample_study_guide})
+        assert ws.receive_json()["type"] == "ready"
+        assert ws.receive_json()["type"] == "answer_recorded"
+        assert ws.receive_json()["type"] == "turn_complete"
+
+        # Student starts answering during the pause.
+        ws.send_json({"type": "speech_start"})
+        import time as _time
+
+        _time.sleep(0.5)
+        session = fake_live.current_session
+        assert session is not None
+        assert len(session.sent_inputs) == 1  # kickoff only, no nudge
+
+        ws.send_json({"type": "end"})
+        ws.receive_json()
 
 
 def test_audio_quota_closes_4429(

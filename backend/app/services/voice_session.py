@@ -26,6 +26,11 @@ logger = logging.getLogger(__name__)
 
 PROMPT_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "voice_coach_template.txt"
 
+# Sent to the coach after the pause that follows its feedback on an answer.
+NEXT_QUESTION_PROMPT = (
+    "Continue: ask the next question now. If you already asked it, repeat it briefly."
+)
+
 
 def _render_prompt(guide: StudyGuide, num_questions: int) -> str:
     template = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -81,6 +86,11 @@ class VoiceSessionCoordinator:
         self.recorded_answers: list[dict[str, Any]] = []
         self.end_quiz_received = False
         self.ended_reason = "client_end"
+        # Pacing and time-limit state
+        self.input_locked = False  # True once the time limit is reached
+        self.model_speaking = False  # audio received since the last turn_complete
+        self.awaiting_response = False  # student finished speaking, coach hasn't completed a turn
+        self.answer_recorded_this_turn = False
 
     async def _send_error_and_close(self, code: int, error_code: str, message: str) -> None:
         try:
@@ -272,6 +282,28 @@ class VoiceSessionCoordinator:
         """
         end_event = asyncio.Event()
         quiz_complete_deadline: float | None = None
+        grace_deadline: float | None = None
+        nudge_task: asyncio.Task[None] | None = None
+
+        async def nudge_next_question() -> None:
+            """After a pause, ask the coach to move on to the next question."""
+            try:
+                await asyncio.sleep(self.settings.voice_next_question_pause_seconds)
+            except asyncio.CancelledError:
+                return
+            if end_event.is_set() or self.input_locked or self.end_quiz_received:
+                return
+            try:
+                if hasattr(live_session, "send"):
+                    await live_session.send(input=NEXT_QUESTION_PROMPT, end_of_turn=True)
+            except Exception as e:
+                logger.warning("Failed to send next-question nudge: %s", e)
+
+        def cancel_nudge() -> None:
+            nonlocal nudge_task
+            if nudge_task is not None and not nudge_task.done():
+                nudge_task.cancel()
+            nudge_task = None
 
         async def client_to_live_task() -> None:
             while not end_event.is_set():
@@ -304,7 +336,11 @@ class VoiceSessionCoordinator:
 
                     msg_type = msg.get("type")
                     if msg_type == "speech_start":
+                        if self.input_locked:
+                            continue
                         if not self.in_speech:
+                            # The student is answering; do not interrupt with a nudge.
+                            cancel_nudge()
                             self.in_speech = True
                             await live_session.send_realtime_input(
                                 activity_start=types.ActivityStart()
@@ -312,6 +348,7 @@ class VoiceSessionCoordinator:
                     elif msg_type == "speech_end":
                         if self.in_speech:
                             self.in_speech = False
+                            self.awaiting_response = True
                             await live_session.send_realtime_input(
                                 activity_end=types.ActivityEnd()
                             )
@@ -333,7 +370,7 @@ class VoiceSessionCoordinator:
                         )
                         raise VoiceCapError(4400, "FRAME_TOO_LARGE", "Frame too large")
 
-                    if not self.in_speech:
+                    if not self.in_speech or self.input_locked:
                         self.dropped_audio_frames += 1
                         continue
 
@@ -349,7 +386,7 @@ class VoiceSessionCoordinator:
                     )
 
         async def live_to_client_task() -> None:
-            nonlocal quiz_complete_deadline
+            nonlocal quiz_complete_deadline, nudge_task
             try:
                 while not end_event.is_set():
                     has_messages = False
@@ -401,14 +438,26 @@ class VoiceSessionCoordinator:
                                         if getattr(part, "inline_data", None) and part.inline_data.data:
                                             data = part.inline_data.data
                                             self.audio_out_bytes += len(data)
+                                            self.model_speaking = True
                                             await self.websocket.send_bytes(data)
 
                                 if getattr(sc, "turn_complete", False):
+                                    self.model_speaking = False
+                                    self.awaiting_response = False
                                     await self.websocket.send_text(json.dumps({"type": "turn_complete"}))
                                     if self.end_quiz_received:
                                         self.ended_reason = "quiz_complete"
                                         end_event.set()
                                         break
+                                    if self.input_locked:
+                                        # Time was up; the coach has finished its turn.
+                                        self.ended_reason = "max_duration"
+                                        end_event.set()
+                                        break
+                                    if self.answer_recorded_this_turn:
+                                        self.answer_recorded_this_turn = False
+                                        cancel_nudge()
+                                        nudge_task = asyncio.create_task(nudge_next_question())
 
                                 if getattr(sc, "interrupted", False):
                                     await self.websocket.send_text(json.dumps({"type": "interrupted"}))
@@ -457,6 +506,7 @@ class VoiceSessionCoordinator:
                                                 "feedback": fb,
                                             }
                                             self.recorded_answers.append(rec)
+                                            self.answer_recorded_this_turn = True
                                             # Client frame
                                             await self.websocket.send_text(
                                                 json.dumps(
@@ -540,11 +590,41 @@ class VoiceSessionCoordinator:
                 raise
 
         async def max_duration_watchdog() -> None:
-            nonlocal quiz_complete_deadline
+            nonlocal quiz_complete_deadline, grace_deadline
             while not end_event.is_set():
                 now = time.monotonic()
                 elapsed = now - self.start_time
-                if elapsed >= self.max_duration_s:
+                if elapsed >= self.max_duration_s and not self.input_locked:
+                    # Time is up: stop taking input, but let the coach finish
+                    # the turn it is in (or the reply it owes) within a grace
+                    # window rather than cutting it off mid-sentence.
+                    self.input_locked = True
+                    cancel_nudge()
+                    grace_deadline = now + self.settings.voice_end_grace_seconds
+                    if self.in_speech:
+                        self.in_speech = False
+                        self.awaiting_response = True
+                        try:
+                            await live_session.send_realtime_input(activity_end=types.ActivityEnd())
+                        except Exception:
+                            pass
+                    try:
+                        await self.websocket.send_text(
+                            json.dumps(
+                                {
+                                    "type": "time_up",
+                                    "grace_s": self.settings.voice_end_grace_seconds,
+                                }
+                            )
+                        )
+                    except Exception:
+                        pass
+                    if not self.model_speaking and not self.awaiting_response:
+                        self.ended_reason = "max_duration"
+                        end_event.set()
+                        break
+
+                if grace_deadline is not None and now >= grace_deadline:
                     self.ended_reason = "max_duration"
                     end_event.set()
                     break
@@ -575,6 +655,7 @@ class VoiceSessionCoordinator:
             return_when=asyncio.FIRST_COMPLETED,
         )
 
+        cancel_nudge()
         for task in pending:
             task.cancel()
             try:

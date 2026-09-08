@@ -57,6 +57,7 @@ export const initialVoiceState = {
   sessionId: null,
   voice: "Kore",
   transcript: [], // [{ role: "user" | "coach", text: string, completed: boolean }]
+  inputLocked: false, // true once the time limit hits; the coach may still finish speaking
   clearPlayback: false,
   answers: [], // [{ index, question, student_answer, correct, feedback }]
   score: null, // { correct, total }
@@ -95,6 +96,11 @@ export function reduceVoiceMessage(prevState, message) {
           text: last.text + message.text,
         };
       } else {
+        // A new speaker means the previous entry is finished, even if no
+        // turn_complete arrived for it (the student's turns never get one).
+        if (last && !last.completed) {
+          transcript[transcript.length - 1] = { ...last, completed: true };
+        }
         transcript.push({
           role: message.role,
           text: message.text,
@@ -128,6 +134,13 @@ export function reduceVoiceMessage(prevState, message) {
       return {
         ...prevState,
         clearPlayback: true,
+      };
+
+    case "time_up":
+      return {
+        ...prevState,
+        secondsLeft: 0,
+        inputLocked: true,
       };
 
     case "answer_recorded": {
@@ -166,6 +179,10 @@ export function reduceVoiceMessage(prevState, message) {
         ...prevState,
         state: "ended",
         endedReason: message.reason,
+        inputLocked: true,
+        transcript: prevState.transcript.map((entry) =>
+          entry.completed ? entry : { ...entry, completed: true }
+        ),
       };
 
     case "error":
