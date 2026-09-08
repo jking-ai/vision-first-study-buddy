@@ -1,22 +1,27 @@
 import React, { useState, useEffect } from "react";
 import {
   Box,
-  Card,
-  CardContent,
   Checkbox,
   Typography,
   Skeleton,
-  Button,
   Stack,
   IconButton,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Button,
 } from "@mui/material";
-import Grid from "@mui/material/Grid2";
 import ImageIcon from "@mui/icons-material/Image";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
@@ -28,11 +33,17 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import apiClient from "../api/client";
 import { getAllLabels, setLabel } from "../utils/materialLabels";
 
-function getFileIcon(contentType) {
-  if (contentType?.startsWith("image/")) return <ImageIcon color="primary" />;
-  if (contentType === "application/pdf") return <PictureAsPdfIcon color="error" />;
-  if (contentType === "application/epub+zip") return <MenuBookIcon color="secondary" />;
-  return <ImageIcon color="action" />;
+function getFileMeta(contentType) {
+  if (contentType?.startsWith("image/")) {
+    return { icon: <ImageIcon color="primary" fontSize="small" />, label: "Image" };
+  }
+  if (contentType === "application/pdf") {
+    return { icon: <PictureAsPdfIcon color="error" fontSize="small" />, label: "PDF" };
+  }
+  if (contentType === "application/epub+zip") {
+    return { icon: <MenuBookIcon color="secondary" fontSize="small" />, label: "EPUB" };
+  }
+  return { icon: <ImageIcon color="action" fontSize="small" />, label: "File" };
 }
 
 function formatSize(bytes) {
@@ -41,6 +52,9 @@ function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+// Columns hidden on phones so the document name keeps the room.
+const wideOnly = { display: { xs: "none", sm: "table-cell" } };
 
 function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDelete }) {
   const [labels, setLabels] = useState({});
@@ -143,19 +157,11 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
 
   if (loading) {
     return (
-      <Grid container spacing={2}>
+      <Stack spacing={1}>
         {[1, 2, 3].map((i) => (
-          <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
-            <Card>
-              <CardContent>
-                <Skeleton variant="circular" width={40} height={40} />
-                <Skeleton variant="text" sx={{ mt: 1 }} />
-                <Skeleton variant="text" width="60%" />
-              </CardContent>
-            </Card>
-          </Grid>
+          <Skeleton key={i} variant="rounded" height={52} />
         ))}
-      </Grid>
+      </Stack>
     );
   }
 
@@ -174,6 +180,7 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
   }
 
   const allSelected = materials.length > 0 && selectedIds.length === materials.length;
+  const someSelected = selectedIds.length > 0 && !allSelected;
 
   const toggleSelect = (id) => {
     if (selectedIds.includes(id)) {
@@ -193,94 +200,135 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
 
   return (
     <Box>
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-        <Button size="small" onClick={toggleAll}>
-          {allSelected ? "Clear All" : "Select All"}
-        </Button>
-        {selectedIds.length > 0 && (
-          <Typography variant="body2" color="text.secondary">
-            {selectedIds.length} of {materials.length} selected
-          </Typography>
-        )}
+      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          {selectedIds.length > 0
+            ? `${selectedIds.length} of ${materials.length} selected`
+            : `${materials.length} document${materials.length === 1 ? "" : "s"}`}
+        </Typography>
       </Stack>
 
-      <Grid container spacing={2}>
-        {materials.map((material) => {
-          const isSelected = selectedIds.includes(material.id);
-          const displayName = labels[material.id] || material.filename;
-          return (
-            <Grid key={material.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              <Card
-                onClick={() => toggleSelect(material.id)}
-                sx={{
-                  cursor: "pointer",
-                  outline: isSelected ? 2 : 0,
-                  outlineColor: "primary.main",
-                  transition: "outline 0.15s",
-                  "&:hover": { elevation: 4 },
-                }}
-              >
-                <CardContent sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                  <Checkbox
-                    checked={isSelected}
-                    onChange={() => toggleSelect(material.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    size="small"
-                  />
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 0 }}>
-                    {getFileIcon(material.content_type)}
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" noWrap title={displayName}>
-                        {displayName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {formatSize(material.size_bytes)}
-                        {labels[material.id] && (
-                          <span style={{ marginLeft: 8, fontStyle: "italic" }}>
-                            ({material.filename})
-                          </span>
+      <TableContainer component={Paper} variant="outlined">
+        <Table size="small" aria-label="Uploaded materials">
+          <TableHead>
+            <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onChange={toggleAll}
+                  inputProps={{ "aria-label": "select all materials" }}
+                />
+              </TableCell>
+              <TableCell>Document</TableCell>
+              <TableCell sx={wideOnly}>Type</TableCell>
+              <TableCell sx={wideOnly} align="right">
+                Size
+              </TableCell>
+              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                Actions
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {materials.map((material) => {
+              const isSelected = selectedIds.includes(material.id);
+              const label = labels[material.id];
+              const displayName = label || material.filename;
+              const { icon, label: typeLabel } = getFileMeta(material.content_type);
+              return (
+                <TableRow
+                  key={material.id}
+                  hover
+                  selected={isSelected}
+                  onClick={() => toggleSelect(material.id)}
+                  sx={{ cursor: "pointer" }}
+                >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => toggleSelect(material.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      inputProps={{ "aria-label": `select ${displayName}` }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ py: 1 }}>
+                    <Stack direction="row" spacing={1} alignItems="flex-start">
+                      <Box sx={{ pt: "2px", flexShrink: 0 }}>{icon}</Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, overflowWrap: "anywhere" }}
+                        >
+                          {displayName}
+                        </Typography>
+                        {label && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: "block", overflowWrap: "anywhere" }}
+                          >
+                            {material.filename}
+                          </Typography>
                         )}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Stack direction="row" spacing={0.5}>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handlePreview(e, material)}
-                      title="Preview"
-                    >
-                      <VisibilityIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleOpenEdit(e, material)}
-                      title="Edit label"
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    {onDelete && (
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleOpenDelete(e, material)}
-                        title="Delete material"
-                        color="error"
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: { xs: "block", sm: "none" } }}
+                        >
+                          {typeLabel}
+                          {material.size_bytes ? ` · ${formatSize(material.size_bytes)}` : ""}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={wideOnly}>
+                    <Typography variant="body2" color="text.secondary">
+                      {typeLabel}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ ...wideOnly, whiteSpace: "nowrap" }} align="right">
+                    <Typography variant="body2" color="text.secondary">
+                      {formatSize(material.size_bytes)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: "nowrap", py: 0.5 }}>
+                    <Tooltip title="Preview">
+                      <IconButton size="small" onClick={(e) => handlePreview(e, material)}>
+                        <VisibilityIcon fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Edit label">
+                      <IconButton size="small" onClick={(e) => handleOpenEdit(e, material)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {onDelete && (
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={(e) => handleOpenDelete(e, material)}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-          );
-        })}
-      </Grid>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Image Preview Dialog */}
       <Dialog open={previewOpen} onClose={handleClosePreview} maxWidth="lg">
-        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          {labels[previewMaterial?.id] || previewMaterial?.filename || "Preview"}
-          <IconButton onClick={handleClosePreview} size="small">
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
+          <Box sx={{ overflowWrap: "anywhere" }}>
+            {labels[previewMaterial?.id] || previewMaterial?.filename || "Preview"}
+          </Box>
+          <IconButton onClick={handleClosePreview} size="small" aria-label="close preview">
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -303,7 +351,7 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
       <Dialog open={editOpen} onClose={handleCloseEdit} maxWidth="sm" fullWidth>
         <DialogTitle>Edit Label</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, overflowWrap: "anywhere" }}>
             Set a custom display name for "{editMaterial?.filename}"
           </Typography>
           <TextField
@@ -332,7 +380,7 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
       <Dialog open={deleteOpen} onClose={handleCloseDelete}>
         <DialogTitle>Delete Document</DialogTitle>
         <DialogContent>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
             Are you sure you want to delete{" "}
             <strong>
               {labels[materialToDelete?.id] || materialToDelete?.filename}

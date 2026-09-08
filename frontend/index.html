@@ -5,8 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Vision-First Study Buddy -- Turn your handwritten notes, whiteboard photos, and PDFs into study guides and quizzes." />
     <title>Vision-First Study Buddy</title>
-    <!-- TODO: Add favicon -->
-    <!-- TODO: Add Google Fonts link for Roboto (MUI default) -->
+    <!--
+      The Dark Reader extension injects a fallback stylesheet that paints every
+      element the same dark grey with the same light text, which makes buttons
+      and hover states unreadable. The lock tag is the official opt-out; the
+      script below removes the sheet for versions that ignore the tag.
+    -->
+    <meta name="darkreader-lock" />
+    <script>
+      (function () {
+        var strip = function () {
+          var nodes = document.querySelectorAll("style.darkreader");
+          for (var i = 0; i < nodes.length; i++) nodes[i].remove();
+        };
+        strip();
+        new MutationObserver(strip).observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap"
+    />
   </head>
   <body>
     <div id="root"></div>

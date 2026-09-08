@@ -113,13 +113,13 @@
 
 **Acceptance criteria:**
 - [x] React 19 project initialized with Vite and MUI: `npm create vite@latest frontend -- --template react`
-- [x] MUI ThemeProvider configured with custom theme supporting light and dark modes
+- [x] MUI ThemeProvider configured with a custom light theme (dark mode was removed later; the app is light-only)
 - [x] `src/api/client.js` exports an API client with methods for all backend endpoints
 - [x] API base URL is configurable via `VITE_API_URL` environment variable (defaults to `http://localhost:8000`)
-- [x] `TopNav.jsx` renders an app bar with navigation links and a dark mode toggle
+- [x] `TopNav.jsx` renders an app bar with navigation links
 - [x] `MaterialUpload.jsx` renders a drag-and-drop zone and file picker supporting images, PDFs, and epubs
 - [x] Upload progress is shown with a progress bar
-- [x] `MaterialList.jsx` displays uploaded materials as cards with file type icons (for documents)
+- [x] `MaterialList.jsx` displays uploaded materials in a selectable table with file type icons; long names wrap
 - [x] `useMaterials.js` hook fetches and refreshes the materials list
 - [x] `useUpload.js` hook handles file validation and upload with simulated progress
 
@@ -159,7 +159,7 @@
 #### 3.5 Dark Mode, Error Handling, and Project Documentation
 
 **Acceptance criteria:**
-- [x] Dark mode toggle in TopNav switches the entire app between light and dark themes
+- [x] ~~Dark mode toggle in TopNav~~ (removed; light-only)
 - [x] Responsive layout works on desktop (1200px+), tablet (768px+), and mobile (375px+) via MUI Grid2
 - [x] All loading states show appropriate feedback (skeletons, spinners, progress bars)
 - [x] All error states display user-friendly messages with retry/dismiss options

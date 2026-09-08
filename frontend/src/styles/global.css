@@ -1,22 +1,22 @@
 /*
  * Global styles for Vision-First Study Buddy.
  *
- * MUI handles most styling through the ThemeProvider.
- * This file contains minimal global resets and CSS variables.
- *
- * TODO: Add global styles once MUI theme is implemented:
- * - CSS variables for custom colors
- * - Font imports (Google Fonts Roboto)
- * - Smooth scrolling
- * - Selection color
- * - Print styles for study guides
+ * MUI handles colours and typography through the ThemeProvider (see theme.js).
+ * This file holds the few things that live outside the theme: layout
+ * variables, resets, and print styles.
  */
+
+:root {
+  /* Height of the fixed status footer; page padding and the voice dock use it. */
+  --vfsb-footer-height: 40px;
+}
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+
 
 body {
   font-family: "Roboto", "Helvetica", "Arial", sans-serif;
@@ -29,6 +29,7 @@ body {
   /* Hide navigation and interactive elements */
   header,
   nav,
+  footer,
   .MuiAppBar-root,
   .MuiDrawer-root,
   button,

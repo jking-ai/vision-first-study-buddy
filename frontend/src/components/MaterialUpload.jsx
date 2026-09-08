@@ -138,7 +138,7 @@ function MaterialUpload({ onUploadComplete }) {
               <Stack direction="row" alignItems="center" spacing={1.5}>
                 <InsertDriveFileIcon color="action" />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" noWrap title={file.name}>
+                  <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
                     {file.name}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">

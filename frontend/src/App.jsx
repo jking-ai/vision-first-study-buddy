@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { ThemeProvider, CssBaseline, Box } from "@mui/material";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { createAppTheme } from "./theme";
@@ -11,35 +11,35 @@ import QuizPage from "./pages/QuizPage";
 import VoicePage from "./pages/VoicePage";
 
 function App() {
-  const [mode, setMode] = useState(
-    () => localStorage.getItem("colorMode") || "light"
-  );
-
-  const toggleColorMode = () => {
-    setMode((prev) => {
-      const next = prev === "light" ? "dark" : "light";
-      localStorage.setItem("colorMode", next);
-      return next;
-    });
-  };
-
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
+  const theme = useMemo(() => createAppTheme(), []);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <TopNav mode={mode} toggleColorMode={toggleColorMode} />
-        <Box sx={{ pb: 5 }}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/materials" element={<MaterialsPage />} />
-            <Route path="/study-guide" element={<StudyGuidePage />} />
-            <Route path="/quiz" element={<QuizPage />} />
-            <Route path="/voice" element={<VoicePage />} />
-          </Routes>
+        <Box
+          sx={{
+            minHeight: "100dvh",
+            display: "flex",
+            flexDirection: "column",
+            bgcolor: "background.default",
+          }}
+        >
+          <TopNav />
+          <Box
+            component="main"
+            sx={{ flex: 1, pb: "calc(var(--vfsb-footer-height) + 16px)" }}
+          >
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/materials" element={<MaterialsPage />} />
+              <Route path="/study-guide" element={<StudyGuidePage />} />
+              <Route path="/quiz" element={<QuizPage />} />
+              <Route path="/voice" element={<VoicePage />} />
+            </Routes>
+          </Box>
+          <Footer />
         </Box>
-        <Footer />
       </BrowserRouter>
     </ThemeProvider>
   );

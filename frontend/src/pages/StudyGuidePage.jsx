@@ -254,7 +254,7 @@ function StudyGuidePage() {
               <Grid key={entry.id} size={{ xs: 12, sm: 6 }}>
                 <Card variant="outlined">
                   <CardContent sx={{ pb: 1 }}>
-                    <Typography variant="subtitle1" noWrap title={entry.displayName}>
+                    <Typography variant="subtitle1" sx={{ overflowWrap: "anywhere" }}>
                       {entry.displayName}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
