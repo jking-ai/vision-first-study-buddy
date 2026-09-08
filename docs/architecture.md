@@ -155,7 +155,7 @@ sequenceDiagram
 | **Voice Model** | Gemini 3.1 Flash Live | `gemini-3.1-flash-live-preview` | Sub-second audio latency, native speech generation and transcription, tool use for oral quiz scoring |
 | **File Storage** | Firebase Storage | N/A | CDN-backed object storage with simple upload/download APIs; integrates with Firebase Admin SDK for server-side access |
 | **Frontend** | React | 19.x | Component-based UI with hooks for state management; broad ecosystem for camera/file APIs |
-| **UI Framework** | MUI (Material UI) | 6.x | Pre-built accessible components (cards, buttons, dialogs, file inputs); responsive grid system for mobile-first design; built-in dark mode support |
+| **UI Framework** | MUI (Material UI) | 6.x | Pre-built accessible components (cards, buttons, dialogs, file inputs); responsive grid system for mobile-first design |
 | **Frontend Tooling** | Vite | 6.x | Fast dev server with HMR; optimized production builds; first-class React support |
 | **Frontend Hosting** | Firebase Hosting | N/A | CDN-backed static hosting with custom domain support; co-located with Firebase Storage |
 | **Container Runtime** | Cloud Run | N/A | Serverless containers with automatic scaling; native IAM for Vertex AI and Firebase access |
@@ -186,7 +186,7 @@ sequenceDiagram
 
 **Decision:** Use Material UI (MUI) instead of a custom CSS framework or Tailwind CSS.
 
-**Rationale:** MUI provides a comprehensive set of pre-built, accessible components that follow Material Design guidelines. The responsive grid system and breakpoint utilities make mobile-first development straightforward. Built-in dark mode support via the theme provider reduces custom CSS. For a study tool that students will primarily use on their phones, the native-feeling Material Design components (FABs, bottom sheets, cards) create a familiar mobile experience.
+**Rationale:** MUI provides a comprehensive set of pre-built, accessible components that follow Material Design guidelines. The responsive grid system and breakpoint utilities make mobile-first development straightforward. Theming via the theme provider reduces custom CSS. For a study tool that students will primarily use on their phones, the native-feeling Material Design components (FABs, bottom sheets, cards) create a familiar mobile experience.
 
 ### 5. No Database
 
@@ -261,7 +261,7 @@ frontend/
   src/
     main.jsx                        # React entry point
     App.jsx                         # Root component with MUI ThemeProvider and routing
-    theme.js                        # MUI theme configuration (light/dark mode)
+    theme.js                        # MUI theme configuration (light only)
     api/
       client.js                     # Fetch wrapper for backend API calls (incl. getVoiceStatus)
     components/
@@ -273,7 +273,7 @@ frontend/
       VoiceControls.jsx             # Hold-to-talk dock fixed above the footer: mic, countdown, end
       VoiceTranscript.jsx           # Real-time dialogue transcript, auto-follows newest message
       VoiceScorePanel.jsx           # Running oral quiz score chip and per-question feedback
-      TopNav.jsx                    # App bar with navigation and dark mode toggle
+      TopNav.jsx                    # App bar with navigation
     pages/
       HomePage.jsx                  # Landing page with upload CTA and 4 step cards
       MaterialsPage.jsx             # Material management and selection view

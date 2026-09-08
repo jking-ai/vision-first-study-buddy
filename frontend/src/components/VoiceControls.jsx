@@ -75,10 +75,7 @@ export function VoiceControls({
         bgcolor: "background.paper",
         borderTop: 1,
         borderColor: "divider",
-        boxShadow: (theme) =>
-          theme.palette.mode === "dark"
-            ? "0 -8px 24px rgba(0, 0, 0, 0.5)"
-            : "0 -8px 24px rgba(15, 23, 42, 0.08)",
+        boxShadow: "0 -8px 24px rgba(15, 23, 42, 0.08)",
       }}
     >
       <Container maxWidth="md" sx={{ height: "100%" }}>

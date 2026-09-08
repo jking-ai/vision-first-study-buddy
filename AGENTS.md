@@ -12,7 +12,7 @@ Vision-First Study Buddy is a multimodal study tool that consumes hand-written n
 - **Storage:** Firebase Storage for uploaded images, PDFs, and epubs
 - **Data:** No database -- uploaded materials are stored in Firebase Storage; generated content is returned directly to the client
 
-**Status:** Phases 1-2 complete (backend fully implemented), Phase 3 (frontend) complete — all pages, components, and hooks implemented with material upload, camera capture, study guide generation, quiz taking/grading, and responsive UI with dark mode.
+**Status:** Phases 1-2 complete (backend fully implemented), Phase 3 (frontend) complete — all pages, components, and hooks implemented with material upload, camera capture, study guide generation, quiz taking/grading, and responsive UI.
 
 ## Build & Run Commands
 
@@ -78,7 +78,7 @@ npm test                           # Run tests
 - **Pages:** HomePage, MaterialsPage, StudyGuidePage, QuizPage, VoicePage
 - **Components:** TopNav, MaterialUpload (drag-drop), MaterialList (selectable table; long names wrap instead of truncating), CameraCapture (MediaDevices API), StudyGuideView (accordion sections), QuizView (taking + results modes), VoiceControls (push-to-talk dock fixed above the footer, with countdown and End), VoiceTranscript (live transcript in page flow; follows the newest message unless the reader scrolls up), VoiceScorePanel (score chip + oral answer feedback; collapsible during a live session)
 - **Hooks:** useMaterials (fetch/refresh list), useUpload (validation + upload), useStudyGuide (generation), useQuiz (generation + submission), useVoiceSession (audio worklet mic capture, 24kHz playback queue, Live API relay)
-- **Theming:** `theme.js` builds the MUI theme per mode. `App.jsx` follows the OS `prefers-color-scheme` until the user toggles, then persists the choice in `localStorage` (`colorMode`). `index.html` carries `<meta name="darkreader-lock">` so the Dark Reader extension does not recolor the app on top of its own dark theme. The fixed status footer's height is the CSS variable `--vfsb-footer-height` (global.css); page padding and the voice dock are positioned from it.
+- **Theming:** light only. `theme.js` builds the MUI theme; there is no dark mode or toggle. `index.html` carries `<meta name="darkreader-lock">` plus a small script that removes the Dark Reader extension's injected stylesheet, because that sheet paints every element the same grey (unreadable buttons and hover states) and some extension versions ignore the lock tag. The fixed status footer's height is the CSS variable `--vfsb-footer-height` (global.css); page padding and the voice dock are positioned from it.
 - **Cross-page state:** Router state (`navigate('/path', { state: { selectedIds, studyGuide } })`) passes material and study guide selections between pages
 
 ### Deployment

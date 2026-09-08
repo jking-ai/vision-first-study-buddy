@@ -1,25 +1,24 @@
 import { createTheme } from "@mui/material/styles";
 
 /**
- * Create a MUI theme for Vision-First Study Buddy.
+ * Create the MUI theme for Vision-First Study Buddy.
  *
- * @param {"light"|"dark"} mode - Color mode
+ * The app is light-only. index.html also opts out of the Dark Reader
+ * extension, whose fallback stylesheet paints every element the same grey.
+ *
  * @returns {import("@mui/material").Theme}
  */
-export function createAppTheme(mode) {
-  const isDark = mode === "dark";
+export function createAppTheme() {
   return createTheme({
     palette: {
-      mode,
+      mode: "light",
       primary: {
-        main: isDark ? "#64b5f6" : "#1976d2",
+        main: "#1976d2",
       },
       secondary: {
-        main: isDark ? "#81c784" : "#388e3c",
+        main: "#388e3c",
       },
-      background: isDark
-        ? { default: "#121212", paper: "#1e1e1e" }
-        : { default: "#f6f8fb", paper: "#ffffff" },
+      background: { default: "#f6f8fb", paper: "#ffffff" },
     },
     shape: {
       borderRadius: 10,
@@ -33,22 +32,8 @@ export function createAppTheme(mode) {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          html: { colorScheme: mode },
-          body: { backgroundColor: isDark ? "#121212" : "#f6f8fb" },
-        },
-      },
-      MuiAppBar: {
-        styleOverrides: {
-          root: isDark
-            ? {
-                // A flat dark surface with a hairline, instead of MUI's
-                // elevation-tinted grey, so it matches the cards below it.
-                backgroundColor: "#1e1e1e",
-                backgroundImage: "none",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
-                boxShadow: "none",
-              }
-            : {},
+          html: { colorScheme: "light" },
+          body: { backgroundColor: "#f6f8fb" },
         },
       },
       MuiCard: {

@@ -13,8 +13,6 @@ import {
   Box,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import Brightness4Icon from "@mui/icons-material/Brightness4";
-import Brightness7Icon from "@mui/icons-material/Brightness7";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
@@ -25,7 +23,7 @@ const NAV_ITEMS = [
   { label: "Voice Coach", path: "/voice" },
 ];
 
-function TopNav({ mode, toggleColorMode }) {
+function TopNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -78,14 +76,6 @@ function TopNav({ mode, toggleColorMode }) {
             ))}
           </Box>
 
-          {/* Dark mode toggle */}
-          <IconButton
-            color="inherit"
-            onClick={toggleColorMode}
-            aria-label="toggle dark mode"
-          >
-            {mode === "dark" ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
         </Toolbar>
       </AppBar>
 
