@@ -48,7 +48,7 @@ export function VoiceTranscript({ transcript = [], autoScroll = false }) {
         }}
       >
         <Typography variant="body2" color="text.secondary" fontStyle="italic" align="center">
-          The conversation will appear here once the coach starts speaking.
+          The conversation will appear here once your tutor starts speaking.
         </Typography>
       </Paper>
     );
@@ -92,7 +92,7 @@ export function VoiceTranscript({ transcript = [], autoScroll = false }) {
                 variant="caption"
                 sx={{ fontWeight: 600, display: "block", mb: 0.25, opacity: 0.8 }}
               >
-                {isUser ? "You" : "Coach"}
+                {isUser ? "You" : "Tutor"}
               </Typography>
               <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                 {entry.text}

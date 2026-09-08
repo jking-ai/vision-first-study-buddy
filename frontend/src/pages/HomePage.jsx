@@ -36,9 +36,9 @@ const steps = [
   },
   {
     icon: <RecordVoiceOverIcon sx={{ fontSize: 48 }} color="primary" />,
-    title: "Quiz by Voice",
+    title: "Talking Tutor",
     description:
-      "Practice out loud with an interactive voice coach. Get real-time spoken feedback and oral quiz scoring.",
+      "Talk it out. Your tutor asks questions from your study guide, listens to your answers, and replies out loud.",
   },
 ];
 

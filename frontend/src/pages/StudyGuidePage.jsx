@@ -141,7 +141,7 @@ function StudyGuidePage() {
             startIcon={<RecordVoiceOverIcon />}
             onClick={() => navigate("/voice", { state: { studyGuide } })}
           >
-            Quiz me by voice
+            Talk it out
           </Button>
         </Stack>
         <StudyGuideView studyGuide={studyGuide} />

@@ -102,10 +102,10 @@ describe("voiceProtocol", () => {
 
   it("maps all error codes correctly", () => {
     expect(getVoiceErrorMessage(4429, "GLOBAL_DAILY_LIMIT")).toBe(
-      "The voice coach is fully booked today. Try again tomorrow."
+      "The tutor is fully booked today. Try again tomorrow."
     );
     expect(getVoiceErrorMessage(4429, "CONCURRENT_LIMIT")).toBe(
-      "The coach is busy with other students right now. Try again in a few minutes."
+      "The tutor is busy with other students right now. Try again in a few minutes."
     );
     expect(getVoiceErrorMessage(4429, "AUDIO_QUOTA_EXCEEDED")).toBe(
       "This session sent more audio than allowed and was ended."

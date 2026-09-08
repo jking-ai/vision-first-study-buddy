@@ -98,7 +98,7 @@ export function VoicePage() {
       case "idle_timeout":
         return "Session ended after inactivity";
       case "upstream_closed":
-        return "The coach disconnected";
+        return "Your tutor disconnected";
       case "client_end":
       default:
         return "Session complete";
@@ -127,7 +127,7 @@ export function VoicePage() {
             No Study Guides Found
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Generate a study guide first, then come back to quiz by voice.
+            Generate a study guide first, then come back to talk it out with your tutor.
           </Typography>
           <Button
             variant="contained"
@@ -159,7 +159,7 @@ export function VoicePage() {
           >
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="h2" component="h1" noWrap>
-                Voice Coach
+                Talking Tutor
               </Typography>
               <Typography variant="body2" color="text.secondary" noWrap>
                 {activeStudyGuide?.title}
@@ -212,10 +212,10 @@ export function VoicePage() {
       >
         <Box>
           <Typography variant="h1" gutterBottom sx={{ fontSize: { xs: "1.8rem", sm: "2.4rem" } }}>
-            Voice Coach
+            Talking Tutor
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Practice out loud with real-time spoken guidance and oral quizzes.
+            Say your answers out loud. Your tutor asks questions from your study guide and replies with spoken feedback.
           </Typography>
         </Box>
 
@@ -279,10 +279,10 @@ export function VoicePage() {
               disabled={!canStartSession}
               sx={{ px: 4, py: 1.8, fontSize: "1.2rem" }}
             >
-              Start Voice Quiz
+              Start Talking
             </Button>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2, maxWidth: 480, mx: "auto" }}>
-              The coach will introduce the quiz and ask Question 1 out loud. Hold the microphone button to reply.
+              Your tutor will introduce the quiz and ask Question 1 out loud. Hold the microphone button to reply.
             </Typography>
           </Box>
         )}
@@ -292,7 +292,7 @@ export function VoicePage() {
           <Box sx={{ textAlign: "center", py: 6 }}>
             <CircularProgress size={48} />
             <Typography variant="h6" sx={{ mt: 2 }}>
-              Connecting to Voice Coach…
+              Connecting to your tutor…
             </Typography>
           </Box>
         )}

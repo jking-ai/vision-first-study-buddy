@@ -62,7 +62,7 @@ export function VoiceControls({
   const timerUrgent = secondsLeft !== null && secondsLeft < 30;
   const title = disabled ? "Time's up" : isTalking ? "Listening…" : "Hold to answer";
   const hint = disabled
-    ? "The coach is finishing up"
+    ? "Your tutor is finishing up"
     : isTalking
       ? "Release when you're done"
       : "Hold the button or press Space";

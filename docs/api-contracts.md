@@ -728,7 +728,7 @@ class ErrorResponse(BaseModel):
 
 ---
 
-## Voice Coach Endpoints
+## Talking Tutor (Voice) Endpoints
 
 ### GET /api/v1/voice/status
 
@@ -752,7 +752,7 @@ Check voice mode availability, caps, and remaining sessions for the current devi
 
 ### WS /api/v1/voice/session
 
-Bidirectional WebSocket connection for live interactive voice coaching and oral quizzes powered by Gemini Live API.
+Bidirectional WebSocket connection for Talking Tutor sessions: live oral quizzes with spoken feedback, powered by the Gemini Live API. The tutor's transcript role is `coach` on the wire.
 
 **Handshake:**
 - No query parameters or subprotocols required.

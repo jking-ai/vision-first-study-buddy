@@ -80,7 +80,7 @@ npm run dev
 3. Upload an image file through the frontend
 4. Generate a study guide from the uploaded material
 5. Generate a quiz and submit answers
-6. Click "Quiz me by voice" on a generated study guide to start an interactive Voice Coach session (`/voice`).
+6. Click "Talk it out" on a generated study guide to start a Talking Tutor session (`/voice`).
 
 ---
 
