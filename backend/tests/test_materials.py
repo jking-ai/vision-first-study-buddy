@@ -211,3 +211,55 @@ async def test_get_material_returns_500_on_signed_url_error():
 
     assert response.status_code == 500
     assert response.json()["detail"]["code"] == "STORAGE_ERROR"
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/v1/materials/{material_id} and DELETE /api/v1/materials
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_material_success():
+    blob = make_blob("mat_to_delete", "photo.jpg")
+    mock = AsyncMock(spec=StorageClient)
+    mock.bucket_name = "test-bucket"
+    mock.get_material_blobs.return_value = [blob]
+    mock.delete_material.return_value = 1
+    apply_storage(mock)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.delete(DETAIL_URL.format(material_id="mat_to_delete"))
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted": "mat_to_delete"}
+    mock.delete_material.assert_awaited_once_with("mat_to_delete", "test-device")
+
+
+@pytest.mark.asyncio
+async def test_delete_material_not_found():
+    mock = AsyncMock(spec=StorageClient)
+    mock.bucket_name = "test-bucket"
+    mock.get_material_blobs.return_value = []
+    apply_storage(mock)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.delete(DETAIL_URL.format(material_id="mat_nonexistent"))
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "MATERIAL_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_clear_materials_success():
+    mock = AsyncMock(spec=StorageClient)
+    mock.bucket_name = "test-bucket"
+    mock.delete_all_materials.return_value = 5
+    apply_storage(mock)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.delete(LIST_URL)
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted_count": 5}
+    mock.delete_all_materials.assert_awaited_once_with("test-device")
+

@@ -36,6 +36,18 @@ class UploadResponse(BaseModel):
     materials: list[MaterialResponse]
 
 
+class MaterialDeleteResponse(BaseModel):
+    """Response for DELETE /api/v1/materials/{material_id}."""
+
+    deleted: str
+
+
+class MaterialsClearResponse(BaseModel):
+    """Response for DELETE /api/v1/materials."""
+
+    deleted_count: int
+
+
 class KeyTerm(BaseModel):
     """A key term with its definition, extracted from study materials."""
 

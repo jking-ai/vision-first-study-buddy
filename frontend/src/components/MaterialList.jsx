@@ -24,6 +24,7 @@ import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import apiClient from "../api/client";
 import { getAllLabels, setLabel } from "../utils/materialLabels";
 
@@ -41,7 +42,7 @@ function formatSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function MaterialList({ materials, selectedIds, onSelectionChange, loading }) {
+function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDelete }) {
   const [labels, setLabels] = useState({});
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -50,6 +51,33 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading }) {
   const [editOpen, setEditOpen] = useState(false);
   const [editMaterial, setEditMaterial] = useState(null);
   const [editValue, setEditValue] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleOpenDelete = (e, material) => {
+    e.stopPropagation();
+    setMaterialToDelete(material);
+    setDeleteOpen(true);
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteOpen(false);
+    setMaterialToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!materialToDelete || !onDelete) return;
+    setDeleteLoading(true);
+    try {
+      await onDelete(materialToDelete.id);
+      handleCloseDelete();
+    } catch (err) {
+      console.error("Failed to delete material:", err);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   useEffect(() => {
     setLabels(getAllLabels());
@@ -230,6 +258,16 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading }) {
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
+                    {onDelete && (
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleOpenDelete(e, material)}
+                        title="Delete material"
+                        color="error"
+                      >
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    )}
                   </Stack>
                 </CardContent>
               </Card>
@@ -286,6 +324,33 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading }) {
           <Button onClick={handleCloseEdit}>Cancel</Button>
           <Button onClick={handleSaveLabel} variant="contained">
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onClose={handleCloseDelete}>
+        <DialogTitle>Delete Document</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Are you sure you want to delete{" "}
+            <strong>
+              {labels[materialToDelete?.id] || materialToDelete?.filename}
+            </strong>
+            ? This will remove it from Firebase Storage.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDelete} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? "Deleting…" : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

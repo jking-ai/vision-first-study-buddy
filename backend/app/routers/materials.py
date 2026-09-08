@@ -9,6 +9,8 @@ from app.models.responses import (
     MaterialDetailResponse,
     MaterialResponse,
     MaterialsListResponse,
+    MaterialDeleteResponse,
+    MaterialsClearResponse,
 )
 from app.services.storage_client import StorageClient, StorageError
 
@@ -123,3 +125,91 @@ async def get_material(
         uploaded_at=blob["time_created"],
         preview_url=preview_url,
     )
+
+
+@router.delete(
+    "/materials/{material_id}",
+    response_model=MaterialDeleteResponse,
+    responses={
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def delete_material(
+    material_id: str,
+    device_id: str = Depends(get_device_id),
+    storage: StorageClient = Depends(get_storage_client),
+) -> MaterialDeleteResponse:
+    """Delete a specific uploaded material and its files.
+
+    Args:
+        material_id: The material identifier (e.g. mat_abc123).
+        device_id: Device identifier from X-Device-ID header.
+        storage: Firebase Storage client (injected).
+
+    Returns:
+        MaterialDeleteResponse confirming deletion.
+
+    Raises:
+        HTTPException 404: If the material does not exist.
+        HTTPException 500: If Firebase Storage operation fails.
+    """
+    try:
+        blobs = await storage.get_material_blobs(material_id, device_id)
+    except StorageError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorBody(code="STORAGE_ERROR", message=str(exc)).model_dump(),
+        )
+
+    if not blobs:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorBody(
+                code="MATERIAL_NOT_FOUND",
+                message=f"No material found with ID '{material_id}'.",
+            ).model_dump(),
+        )
+
+    try:
+        await storage.delete_material(material_id, device_id)
+    except StorageError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorBody(code="STORAGE_ERROR", message=str(exc)).model_dump(),
+        )
+
+    return MaterialDeleteResponse(deleted=material_id)
+
+
+@router.delete(
+    "/materials",
+    response_model=MaterialsClearResponse,
+    responses={500: {"model": ErrorResponse}},
+)
+async def clear_materials(
+    device_id: str = Depends(get_device_id),
+    storage: StorageClient = Depends(get_storage_client),
+) -> MaterialsClearResponse:
+    """Clear all uploaded materials for the current device.
+
+    Args:
+        device_id: Device identifier from X-Device-ID header.
+        storage: Firebase Storage client (injected).
+
+    Returns:
+        MaterialsClearResponse with the number of files deleted.
+
+    Raises:
+        HTTPException 500: If Firebase Storage operation fails.
+    """
+    try:
+        count = await storage.delete_all_materials(device_id)
+    except StorageError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorBody(code="STORAGE_ERROR", message=str(exc)).model_dump(),
+        )
+
+    return MaterialsClearResponse(deleted_count=count)
+

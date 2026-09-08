@@ -26,6 +26,10 @@ class LiveSessionProtocol(Protocol):
         """Send realtime audio or activity signal to the Live session."""
         ...
 
+    async def send(self, *, input: Any = None, end_of_turn: bool = True) -> None:
+        """Send text or content turn to the Live session."""
+        ...
+
     async def send_tool_response(
         self,
         *,

@@ -200,13 +200,17 @@ export function VoicePage() {
             <Button
               variant="contained"
               size="large"
+              color="primary"
               startIcon={<RecordVoiceOverIcon />}
               onClick={start}
               disabled={!canStartSession}
-              sx={{ px: 4, py: 1.5, fontSize: "1.1rem" }}
+              sx={{ px: 4, py: 1.8, fontSize: "1.2rem", fontWeight: "bold" }}
             >
-              Start Session
+              Start Voice Quiz
             </Button>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, maxWidth: 480, mx: "auto" }}>
+              The coach will speak right away to introduce the quiz and ask Question 1 out loud. Hold the microphone button to reply.
+            </Typography>
           </Box>
         )}
 

@@ -76,6 +76,59 @@ class StorageClient:
         except Exception as e:
             raise StorageError(f"Failed to delete file at {storage_path}: {e}") from e
 
+    async def delete_material(self, material_id: str, device_id: str) -> int:
+        """Delete all files belonging to a specific material ID for a device.
+
+        Args:
+            material_id: The material identifier (e.g. mat_abc123).
+            device_id: The device identifier.
+
+        Returns:
+            Number of blobs deleted.
+
+        Raises:
+            StorageError: If deletion fails.
+        """
+        try:
+            prefix = f"materials/{device_id}/{material_id}/"
+
+            def _delete():
+                blobs = list(self.bucket.list_blobs(prefix=prefix))
+                count = len(blobs)
+                for blob in blobs:
+                    blob.delete()
+                return count
+
+            return await asyncio.to_thread(_delete)
+        except Exception as e:
+            raise StorageError(f"Failed to delete material '{material_id}': {e}") from e
+
+    async def delete_all_materials(self, device_id: str) -> int:
+        """Delete all materials belonging to a device.
+
+        Args:
+            device_id: The device identifier.
+
+        Returns:
+            Number of blobs deleted.
+
+        Raises:
+            StorageError: If deletion fails.
+        """
+        try:
+            prefix = f"materials/{device_id}/"
+
+            def _delete():
+                blobs = list(self.bucket.list_blobs(prefix=prefix))
+                count = len(blobs)
+                for blob in blobs:
+                    blob.delete()
+                return count
+
+            return await asyncio.to_thread(_delete)
+        except Exception as e:
+            raise StorageError(f"Failed to delete all materials for device '{device_id}': {e}") from e
+
     def _get_signing_credentials(self):
         """Get or cache signing credentials for Cloud Run's compute SA.
 

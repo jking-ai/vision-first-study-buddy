@@ -66,6 +66,12 @@ export const apiClient = {
   /** Get details for a single material */
   getMaterial: (id) => request(`/materials/${id}`),
 
+  /** Delete a single material */
+  deleteMaterial: (id) => request(`/materials/${id}`, { method: "DELETE" }),
+
+  /** Clear all uploaded materials for this device */
+  clearAllMaterials: () => request("/materials", { method: "DELETE" }),
+
   /** Generate a study guide from selected materials */
   generateStudyGuide: (materialIds, focusTopics, detailLevel) =>
     request("/study-guides/generate", {

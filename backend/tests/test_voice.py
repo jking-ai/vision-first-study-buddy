@@ -26,6 +26,8 @@ class FakeLiveSession:
         self.sent_realtime_inputs: list[dict[str, Any]] = []
         self.sent_tool_responses: list[list[Any]] = []
         self.incoming_queue: asyncio.Queue[Any] = asyncio.Queue()
+        self.sent_inputs: list[dict[str, Any]] = []
+        self.is_closed = False
         if incoming_messages:
             for msg in incoming_messages:
                 self.incoming_queue.put_nowait(msg)
@@ -45,6 +47,9 @@ class FakeLiveSession:
             }
         )
 
+    async def send(self, *, input: Any = None, end_of_turn: bool = True) -> None:
+        self.sent_inputs.append({"input": input, "end_of_turn": end_of_turn})
+
     async def send_tool_response(
         self,
         *,
@@ -53,14 +58,15 @@ class FakeLiveSession:
         self.sent_tool_responses.append(function_responses)
 
     async def receive(self) -> AsyncIterator[Any]:
-        while True:
+        while not self.is_closed:
             msg = await self.incoming_queue.get()
             if msg is None:
+                self.is_closed = True
                 break
             yield msg
 
     async def close(self) -> None:
-        pass
+        self.is_closed = True
 
 
 class FakeLiveClient(LiveClient):
@@ -102,6 +108,7 @@ def voice_enabled_settings() -> Settings:
         gemini_live_api_key="test-live-key",
         voice_start_timeout_seconds=5.0,
         voice_session_max_seconds=180,
+        voice_sessions_per_device_per_day=2,
     )
 
 

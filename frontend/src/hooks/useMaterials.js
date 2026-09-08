@@ -26,11 +26,31 @@ export function useMaterials() {
     }
   }, []);
 
+  const deleteMaterial = useCallback(async (id) => {
+    try {
+      await apiClient.deleteMaterial(id);
+      setMaterials((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
+  const clearAllMaterials = useCallback(async () => {
+    try {
+      await apiClient.clearAllMaterials();
+      setMaterials([]);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
   useEffect(() => {
     fetchMaterials();
   }, [fetchMaterials]);
 
-  return { materials, loading, error, fetchMaterials };
+  return { materials, loading, error, fetchMaterials, deleteMaterial, clearAllMaterials };
 }
 
 export default useMaterials;

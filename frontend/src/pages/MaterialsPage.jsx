@@ -9,11 +9,17 @@ import {
   Tabs,
   Tab,
   Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
 } from "@mui/material";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import QuizIcon from "@mui/icons-material/Quiz";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import MaterialUpload from "../components/MaterialUpload";
 import MaterialList from "../components/MaterialList";
 import CameraCapture from "../components/CameraCapture";
@@ -21,10 +27,12 @@ import useMaterials from "../hooks/useMaterials";
 import useUpload from "../hooks/useUpload";
 
 function MaterialsPage() {
-  const { materials, loading, error, fetchMaterials } = useMaterials();
+  const { materials, loading, error, fetchMaterials, deleteMaterial, clearAllMaterials } = useMaterials();
   const { uploadFiles } = useUpload();
   const [selectedIds, setSelectedIds] = useState([]);
   const [tab, setTab] = useState(0);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleUploadComplete = () => {
@@ -46,11 +54,42 @@ function MaterialsPage() {
     navigate("/quiz", { state: { selectedIds } });
   };
 
+  const handleClearAllConfirm = async () => {
+    setClearLoading(true);
+    try {
+      await clearAllMaterials();
+      setSelectedIds([]);
+      setClearDialogOpen(false);
+    } catch (err) {
+      console.error("Failed to clear materials:", err);
+    } finally {
+      setClearLoading(false);
+    }
+  };
+
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h1" gutterBottom>
-        My Materials
-      </Typography>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mb: 2 }}
+      >
+        <Typography variant="h1" sx={{ fontSize: { xs: "2rem", sm: "2.5rem" } }}>
+          My Materials
+        </Typography>
+        {materials.length > 0 && (
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            startIcon={<DeleteSweepIcon />}
+            onClick={() => setClearDialogOpen(true)}
+          >
+            Clear All Documents
+          </Button>
+        )}
+      </Stack>
 
       {/* Upload tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
@@ -69,6 +108,7 @@ function MaterialsPage() {
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         loading={loading}
+        onDelete={deleteMaterial}
       />
 
       {error && (
@@ -97,6 +137,30 @@ function MaterialsPage() {
           </Button>
         </Stack>
       )}
+
+      {/* Clear All Confirmation Dialog */}
+      <Dialog open={clearDialogOpen} onClose={() => setClearDialogOpen(false)}>
+        <DialogTitle>Clear All Materials</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Are you sure you want to delete all <strong>{materials.length}</strong> uploaded documents?
+            This will remove them completely from Firebase Storage so you can start fresh.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClearDialogOpen(false)} disabled={clearLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleClearAllConfirm}
+            color="error"
+            variant="contained"
+            disabled={clearLoading}
+          >
+            {clearLoading ? "Clearing…" : "Clear All"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

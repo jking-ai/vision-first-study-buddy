@@ -58,8 +58,8 @@ class Settings(BaseSettings):
         "Zephyr",
     ]
     voice_session_max_seconds: int = 180
-    voice_sessions_per_device_per_day: int = 2
-    voice_sessions_per_day_global: int = 20
+    voice_sessions_per_device_per_day: int = 5
+    voice_sessions_per_day_global: int = 30
     voice_max_concurrent_sessions: int = 2
     voice_idle_timeout_seconds: int = 45
     voice_start_timeout_seconds: float = 5.0

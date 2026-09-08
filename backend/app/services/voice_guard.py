@@ -84,11 +84,20 @@ class VoiceSessionGuard:
             self._global_daily_count += 1
             self._device_daily_counts[device_id] = device_count + 1
 
-    async def release(self, device_id: str) -> None:
-        """Release an active session slot upon session end."""
+    async def release(self, device_id: str, refund: bool = False) -> None:
+        """Release an active session slot upon session end.
+
+        If refund is True, decrements daily session counts so failed/aborted
+        sessions don't penalize the user.
+        """
         async with self._lock:
             if self._active_sessions > 0:
                 self._active_sessions -= 1
+            if refund:
+                if self._global_daily_count > 0:
+                    self._global_daily_count -= 1
+                if device_id in self._device_daily_counts and self._device_daily_counts[device_id] > 0:
+                    self._device_daily_counts[device_id] -= 1
 
     async def get_remaining_today(self, device_id: str, settings: Settings | None = None) -> int:
         """Return the number of voice sessions remaining for the device today.

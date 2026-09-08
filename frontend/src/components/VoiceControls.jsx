@@ -105,11 +105,11 @@ export function VoiceControls({
         >
           <MicIcon sx={{ fontSize: 48 }} />
           <Typography variant="button" sx={{ fontSize: "0.85rem", fontWeight: "bold" }}>
-            {isTalking ? "Listening..." : "Hold to Talk"}
+            {isTalking ? "Listening..." : "Hold to Answer"}
           </Typography>
         </Button>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5 }}>
-          Hold button or press Space to speak • Release when done
+          Hold button or press Space to speak your answer • Release when done
         </Typography>
       </Box>
     </Box>

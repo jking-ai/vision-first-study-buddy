@@ -14,6 +14,8 @@ from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from google.genai import types
+import websockets
+import websockets.exceptions
 
 from app.config import Settings
 from app.models.responses import StudyGuide
@@ -249,7 +251,8 @@ class VoiceSessionCoordinator:
             await self._send_error_and_close(1011, "UPSTREAM_ERROR", f"Voice service error: {e}")
             return
         finally:
-            await self.guard.release(self.device_id)
+            refund = self.ended_reason in ("upstream_closed", "error", "connection_error")
+            await self.guard.release(self.device_id, refund=refund)
             self._log_session_end()
 
         if clean_exit:
@@ -348,173 +351,182 @@ class VoiceSessionCoordinator:
         async def live_to_client_task() -> None:
             nonlocal quiz_complete_deadline
             try:
-                async for msg in live_session.receive():
-                    if end_event.is_set():
-                        break
-
-                    # Usage metadata
-                    if getattr(msg, "usage_metadata", None):
-                        meta = msg.usage_metadata
-                        if getattr(meta, "prompt_token_count", None) is not None:
-                            self.input_tokens = meta.prompt_token_count
-                        if getattr(meta, "response_token_count", None) is not None:
-                            self.output_tokens = meta.response_token_count
-
-                    # Server content
-                    if getattr(sc := getattr(msg, "server_content", None), "model_turn", None) or sc:
-                        # Transcriptions first
-                        if getattr(sc, "input_transcription", None) and sc.input_transcription.text:
-                            await self.websocket.send_text(
-                                json.dumps(
-                                    {
-                                        "type": "transcript",
-                                        "role": "user",
-                                        "text": sc.input_transcription.text,
-                                    }
-                                )
-                            )
-
-                        if (
-                            getattr(sc, "output_transcription", None)
-                            and sc.output_transcription.text
-                        ):
-                            await self.websocket.send_text(
-                                json.dumps(
-                                    {
-                                        "type": "transcript",
-                                        "role": "coach",
-                                        "text": sc.output_transcription.text,
-                                    }
-                                )
-                            )
-
-                        # Model turn parts (audio / text)
-                        if getattr(sc, "model_turn", None) and sc.model_turn.parts:
-                            for part in sc.model_turn.parts:
-                                if getattr(part, "inline_data", None) and part.inline_data.data:
-                                    data = part.inline_data.data
-                                    self.audio_out_bytes += len(data)
-                                    await self.websocket.send_bytes(data)
-
-                        if getattr(sc, "turn_complete", False):
-                            await self.websocket.send_text(json.dumps({"type": "turn_complete"}))
-                            if self.end_quiz_received:
-                                self.ended_reason = "quiz_complete"
-                                end_event.set()
+                while not end_event.is_set():
+                    has_messages = False
+                    try:
+                        async for msg in live_session.receive():
+                            has_messages = True
+                            if end_event.is_set():
                                 break
 
-                        if getattr(sc, "interrupted", False):
-                            await self.websocket.send_text(json.dumps({"type": "interrupted"}))
+                            # Usage metadata
+                            if getattr(msg, "usage_metadata", None):
+                                meta = msg.usage_metadata
+                                if getattr(meta, "prompt_token_count", None) is not None:
+                                    self.input_tokens = meta.prompt_token_count
+                                if getattr(meta, "response_token_count", None) is not None:
+                                    self.output_tokens = meta.response_token_count
 
-                    # Tool call (Phase 3)
-                    if getattr(msg, "tool_call", None) and msg.tool_call.function_calls:
-                        responses = []
-                        for fc in msg.tool_call.function_calls:
-                            fc_id = getattr(fc, "id", "")
-                            fc_name = getattr(fc, "name", "")
-                            fc_args = getattr(fc, "args", {}) or {}
-
-                            if fc_name == "record_answer":
-                                # Validate args
-                                q = fc_args.get("question")
-                                sa = fc_args.get("student_answer")
-                                c = fc_args.get("correct")
-                                fb = fc_args.get("feedback")
-
-                                if not all([isinstance(q, str), isinstance(sa, str), isinstance(c, bool), isinstance(fb, str)]):
-                                    responses.append(
-                                        types.FunctionResponse(
-                                            id=fc_id,
-                                            name=fc_name,
-                                            response={"status": "error", "reason": "invalid_arguments"},
-                                        )
-                                    )
-                                elif len(self.recorded_answers) >= self.num_questions:
-                                    responses.append(
-                                        types.FunctionResponse(
-                                            id=fc_id,
-                                            name=fc_name,
-                                            response={"status": "ignored", "reason": "quiz_full"},
-                                        )
-                                    )
-                                else:
-                                    self.questions_asked += 1
-                                    if c:
-                                        self.questions_correct += 1
-                                    idx = len(self.recorded_answers) + 1
-                                    rec = {
-                                        "index": idx,
-                                        "question": q,
-                                        "student_answer": sa,
-                                        "correct": c,
-                                        "feedback": fb,
-                                    }
-                                    self.recorded_answers.append(rec)
-                                    # Client frame
+                            # Server content
+                            if getattr(sc := getattr(msg, "server_content", None), "model_turn", None) or sc:
+                                # Transcriptions first
+                                if getattr(sc, "input_transcription", None) and sc.input_transcription.text:
                                     await self.websocket.send_text(
                                         json.dumps(
                                             {
-                                                "type": "answer_recorded",
+                                                "type": "transcript",
+                                                "role": "user",
+                                                "text": sc.input_transcription.text,
+                                            }
+                                        )
+                                    )
+
+                                if (
+                                    getattr(sc, "output_transcription", None)
+                                    and sc.output_transcription.text
+                                ):
+                                    await self.websocket.send_text(
+                                        json.dumps(
+                                            {
+                                                "type": "transcript",
+                                                "role": "coach",
+                                                "text": sc.output_transcription.text,
+                                            }
+                                        )
+                                    )
+
+                                # Model turn parts (audio / text)
+                                if getattr(sc, "model_turn", None) and sc.model_turn.parts:
+                                    for part in sc.model_turn.parts:
+                                        if getattr(part, "inline_data", None) and part.inline_data.data:
+                                            data = part.inline_data.data
+                                            self.audio_out_bytes += len(data)
+                                            await self.websocket.send_bytes(data)
+
+                                if getattr(sc, "turn_complete", False):
+                                    await self.websocket.send_text(json.dumps({"type": "turn_complete"}))
+                                    if self.end_quiz_received:
+                                        self.ended_reason = "quiz_complete"
+                                        end_event.set()
+                                        break
+
+                                if getattr(sc, "interrupted", False):
+                                    await self.websocket.send_text(json.dumps({"type": "interrupted"}))
+
+                            # Tool call (Phase 3)
+                            if getattr(msg, "tool_call", None) and msg.tool_call.function_calls:
+                                responses = []
+                                for fc in msg.tool_call.function_calls:
+                                    fc_id = getattr(fc, "id", "")
+                                    fc_name = getattr(fc, "name", "")
+                                    fc_args = getattr(fc, "args", {}) or {}
+
+                                    if fc_name == "record_answer":
+                                        # Validate args
+                                        q = fc_args.get("question")
+                                        sa = fc_args.get("student_answer")
+                                        c = fc_args.get("correct")
+                                        fb = fc_args.get("feedback")
+
+                                        if not all([isinstance(q, str), isinstance(sa, str), isinstance(c, bool), isinstance(fb, str)]):
+                                            responses.append(
+                                                types.FunctionResponse(
+                                                    id=fc_id,
+                                                    name=fc_name,
+                                                    response={"status": "error", "reason": "invalid_arguments"},
+                                                )
+                                            )
+                                        elif len(self.recorded_answers) >= self.num_questions:
+                                            responses.append(
+                                                types.FunctionResponse(
+                                                    id=fc_id,
+                                                    name=fc_name,
+                                                    response={"status": "ignored", "reason": "quiz_full"},
+                                                )
+                                            )
+                                        else:
+                                            self.questions_asked += 1
+                                            if c:
+                                                self.questions_correct += 1
+                                            idx = len(self.recorded_answers) + 1
+                                            rec = {
                                                 "index": idx,
                                                 "question": q,
                                                 "student_answer": sa,
                                                 "correct": c,
                                                 "feedback": fb,
-                                                "score": {
-                                                    "correct": self.questions_correct,
-                                                    "total": self.num_questions,
-                                                },
                                             }
-                                        )
-                                    )
-                                    responses.append(
-                                        types.FunctionResponse(
-                                            id=fc_id,
-                                            name=fc_name,
-                                            response={
-                                                "status": "ok",
-                                                "recorded": idx,
-                                                "remaining": self.num_questions - idx,
-                                            },
-                                        )
-                                    )
+                                            self.recorded_answers.append(rec)
+                                            # Client frame
+                                            await self.websocket.send_text(
+                                                json.dumps(
+                                                    {
+                                                        "type": "answer_recorded",
+                                                        "index": idx,
+                                                        "question": q,
+                                                        "student_answer": sa,
+                                                        "correct": c,
+                                                        "feedback": fb,
+                                                        "score": {
+                                                            "correct": self.questions_correct,
+                                                            "total": self.num_questions,
+                                                        },
+                                                    }
+                                                )
+                                            )
+                                            responses.append(
+                                                types.FunctionResponse(
+                                                    id=fc_id,
+                                                    name=fc_name,
+                                                    response={
+                                                        "status": "ok",
+                                                        "recorded": idx,
+                                                        "remaining": self.num_questions - idx,
+                                                    },
+                                                )
+                                            )
 
-                            elif fc_name == "end_quiz":
-                                summary = fc_args.get("summary")
-                                if not summary or not isinstance(summary, str):
-                                    responses.append(
-                                        types.FunctionResponse(
-                                            id=fc_id,
-                                            name=fc_name,
-                                            response={"status": "error", "reason": "invalid_arguments"},
-                                        )
-                                    )
-                                else:
-                                    self.end_quiz_received = True
-                                    quiz_complete_deadline = time.monotonic() + 15.0
-                                    await self.websocket.send_text(
-                                        json.dumps(
-                                            {
-                                                "type": "quiz_summary",
-                                                "summary": summary,
-                                                "score": {
-                                                    "correct": self.questions_correct,
-                                                    "asked": self.questions_asked,
-                                                    "total": self.num_questions,
-                                                },
-                                            }
-                                        )
-                                    )
-                                    responses.append(
-                                        types.FunctionResponse(
-                                            id=fc_id,
-                                            name=fc_name,
-                                            response={"status": "ok"},
-                                        )
-                                    )
+                                    elif fc_name == "end_quiz":
+                                        summary = fc_args.get("summary")
+                                        if not summary or not isinstance(summary, str):
+                                            responses.append(
+                                                types.FunctionResponse(
+                                                    id=fc_id,
+                                                    name=fc_name,
+                                                    response={"status": "error", "reason": "invalid_arguments"},
+                                                )
+                                            )
+                                        else:
+                                            self.end_quiz_received = True
+                                            quiz_complete_deadline = time.monotonic() + 15.0
+                                            await self.websocket.send_text(
+                                                json.dumps(
+                                                    {
+                                                        "type": "quiz_summary",
+                                                        "summary": summary,
+                                                        "score": {
+                                                            "correct": self.questions_correct,
+                                                            "asked": self.questions_asked,
+                                                            "total": self.num_questions,
+                                                        },
+                                                    }
+                                                )
+                                            )
+                                            responses.append(
+                                                types.FunctionResponse(
+                                                    id=fc_id,
+                                                    name=fc_name,
+                                                    response={"status": "ok"},
+                                                )
+                                            )
 
-                        if responses:
-                            await live_session.send_tool_response(function_responses=responses)
+                                if responses:
+                                    await live_session.send_tool_response(function_responses=responses)
+                    except (websockets.exceptions.ConnectionClosed, ConnectionResetError):
+                        break
+
+                    if not has_messages or getattr(live_session, "is_closed", False):
+                        break
 
                 # Upstream stream ended
                 if not end_event.is_set():
@@ -547,6 +559,16 @@ class VoiceSessionCoordinator:
         t_client = asyncio.create_task(client_to_live_task())
         t_live = asyncio.create_task(live_to_client_task())
         t_timer = asyncio.create_task(max_duration_watchdog())
+
+        # Proactively prompt the coach to greet and ask Question 1 out loud
+        try:
+            if hasattr(live_session, "send"):
+                await live_session.send(
+                    input="Start the oral quiz now. Introduce the quiz in one sentence and ask Question 1 out loud.",
+                    end_of_turn=True,
+                )
+        except Exception as e:
+            logger.warning("Failed to send initial kickoff prompt: %s", e)
 
         done, pending = await asyncio.wait(
             [t_client, t_live, t_timer],
