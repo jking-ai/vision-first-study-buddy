@@ -14,6 +14,7 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import QuizIcon from "@mui/icons-material/Quiz";
@@ -33,6 +34,7 @@ function MaterialsPage() {
   const [tab, setTab] = useState(0);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearLoading, setClearLoading] = useState(false);
+  const [clearError, setClearError] = useState(null);
   const navigate = useNavigate();
 
   const handleUploadComplete = () => {
@@ -56,12 +58,14 @@ function MaterialsPage() {
 
   const handleClearAllConfirm = async () => {
     setClearLoading(true);
+    setClearError(null);
     try {
       await clearAllMaterials();
       setSelectedIds([]);
       setClearDialogOpen(false);
     } catch (err) {
       console.error("Failed to clear materials:", err);
+      setClearError(err.message || "Clear failed.");
     } finally {
       setClearLoading(false);
     }
@@ -139,13 +143,24 @@ function MaterialsPage() {
       )}
 
       {/* Clear All Confirmation Dialog */}
-      <Dialog open={clearDialogOpen} onClose={() => setClearDialogOpen(false)}>
+      <Dialog
+        open={clearDialogOpen}
+        onClose={() => {
+          setClearDialogOpen(false);
+          setClearError(null);
+        }}
+      >
         <DialogTitle>Clear All Materials</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
             Are you sure you want to delete all <strong>{materials.length}</strong> uploaded documents?
             This will remove them completely from Firebase Storage so you can start fresh.
           </Typography>
+          {clearError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              Could not clear: {clearError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setClearDialogOpen(false)} disabled={clearLoading}>

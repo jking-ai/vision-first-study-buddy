@@ -26,24 +26,16 @@ export function useMaterials() {
     }
   }, []);
 
+  // Delete failures are thrown to the caller, which shows them in its own
+  // dialog; they are not list-loading errors.
   const deleteMaterial = useCallback(async (id) => {
-    try {
-      await apiClient.deleteMaterial(id);
-      setMaterials((prev) => prev.filter((m) => m.id !== id));
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
+    await apiClient.deleteMaterial(id);
+    setMaterials((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
   const clearAllMaterials = useCallback(async () => {
-    try {
-      await apiClient.clearAllMaterials();
-      setMaterials([]);
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
+    await apiClient.clearAllMaterials();
+    setMaterials([]);
   }, []);
 
   useEffect(() => {
