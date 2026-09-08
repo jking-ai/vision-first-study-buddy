@@ -266,12 +266,12 @@ frontend/
       client.js                     # Fetch wrapper for backend API calls (incl. getVoiceStatus)
     components/
       MaterialUpload.jsx            # Drag-and-drop + file picker upload component
-      MaterialList.jsx              # Grid/list of uploaded materials with thumbnails
+      MaterialList.jsx              # Selectable table of uploaded materials (names wrap)
       StudyGuideView.jsx            # Rendered study guide with sections and highlights
       QuizView.jsx                  # Interactive quiz with question cards and answer inputs
       CameraCapture.jsx             # Camera integration for snapping photos of notes
-      VoiceControls.jsx             # Hold-to-talk button, countdown timer, end session
-      VoiceTranscript.jsx           # Real-time dialogue transcript
+      VoiceControls.jsx             # Hold-to-talk dock fixed above the footer: mic, countdown, end
+      VoiceTranscript.jsx           # Real-time dialogue transcript, auto-follows newest message
       VoiceScorePanel.jsx           # Running oral quiz score chip and per-question feedback
       TopNav.jsx                    # App bar with navigation and dark mode toggle
     pages/

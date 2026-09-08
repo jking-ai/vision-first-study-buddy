@@ -76,8 +76,9 @@ npm test                           # Run tests
 
 **Frontend architecture:**
 - **Pages:** HomePage, MaterialsPage, StudyGuidePage, QuizPage, VoicePage
-- **Components:** TopNav, MaterialUpload (drag-drop), MaterialList (card grid with selection), CameraCapture (MediaDevices API), StudyGuideView (accordion sections), QuizView (taking + results modes), VoiceControls (push-to-talk + countdown), VoiceTranscript (live speaker transcript), VoiceScorePanel (score chip + oral answer feedback)
+- **Components:** TopNav, MaterialUpload (drag-drop), MaterialList (selectable table; long names wrap instead of truncating), CameraCapture (MediaDevices API), StudyGuideView (accordion sections), QuizView (taking + results modes), VoiceControls (push-to-talk dock fixed above the footer, with countdown and End), VoiceTranscript (live transcript in page flow; follows the newest message unless the reader scrolls up), VoiceScorePanel (score chip + oral answer feedback; collapsible during a live session)
 - **Hooks:** useMaterials (fetch/refresh list), useUpload (validation + upload), useStudyGuide (generation), useQuiz (generation + submission), useVoiceSession (audio worklet mic capture, 24kHz playback queue, Live API relay)
+- **Theming:** `theme.js` builds the MUI theme per mode. `App.jsx` follows the OS `prefers-color-scheme` until the user toggles, then persists the choice in `localStorage` (`colorMode`). `index.html` carries `<meta name="darkreader-lock">` so the Dark Reader extension does not recolor the app on top of its own dark theme. The fixed status footer's height is the CSS variable `--vfsb-footer-height` (global.css); page padding and the voice dock are positioned from it.
 - **Cross-page state:** Router state (`navigate('/path', { state: { selectedIds, studyGuide } })`) passes material and study guide selections between pages
 
 ### Deployment

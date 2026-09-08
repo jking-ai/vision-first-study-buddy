@@ -119,7 +119,7 @@
 - [x] `TopNav.jsx` renders an app bar with navigation links and a dark mode toggle
 - [x] `MaterialUpload.jsx` renders a drag-and-drop zone and file picker supporting images, PDFs, and epubs
 - [x] Upload progress is shown with a progress bar
-- [x] `MaterialList.jsx` displays uploaded materials as cards with file type icons (for documents)
+- [x] `MaterialList.jsx` displays uploaded materials in a selectable table with file type icons; long names wrap
 - [x] `useMaterials.js` hook fetches and refreshes the materials list
 - [x] `useUpload.js` hook handles file validation and upload with simulated progress
 

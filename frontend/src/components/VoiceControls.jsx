@@ -1,8 +1,11 @@
 import React, { useEffect, useCallback } from "react";
-import { Box, Button, Typography, Stack, Chip } from "@mui/material";
+import { Box, Button, Typography, Stack, Chip, Container } from "@mui/material";
 import MicIcon from "@mui/icons-material/Mic";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
 import TimerIcon from "@mui/icons-material/Timer";
+
+/** Height of the fixed push-to-talk dock, in px. Pages add this as bottom padding. */
+export const VOICE_DOCK_HEIGHT = 104;
 
 function formatSeconds(seconds) {
   if (seconds === null || seconds === undefined) return "0:00";
@@ -11,6 +14,10 @@ function formatSeconds(seconds) {
   return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
+/**
+ * Push-to-talk controls, docked to the bottom of the viewport (above the
+ * status footer) so they stay put while the conversation scrolls behind them.
+ */
 export function VoiceControls({
   state,
   secondsLeft,
@@ -20,26 +27,27 @@ export function VoiceControls({
   disabled = false,
 }) {
   const isTalking = state === "talking";
+  const isActive = state === "ready" || state === "talking";
 
   const handleKeyDown = useCallback(
     (e) => {
-      if (e.code === "Space" && !disabled && (state === "ready" || state === "talking")) {
+      if (e.code === "Space" && !e.repeat && !disabled && isActive) {
         // Prevent page scroll
         e.preventDefault();
         onPressTalk();
       }
     },
-    [disabled, state, onPressTalk]
+    [disabled, isActive, onPressTalk]
   );
 
   const handleKeyUp = useCallback(
     (e) => {
-      if (e.code === "Space" && !disabled && (state === "ready" || state === "talking")) {
+      if (e.code === "Space" && !disabled && isActive) {
         e.preventDefault();
         onReleaseTalk();
       }
     },
-    [disabled, state, onReleaseTalk]
+    [disabled, isActive, onReleaseTalk]
   );
 
   useEffect(() => {
@@ -51,67 +59,108 @@ export function VoiceControls({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  return (
-    <Box sx={{ textAlign: "center", py: 2 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 3 }}
-      >
-        <Chip
-          icon={<TimerIcon />}
-          label={formatSeconds(secondsLeft)}
-          color={secondsLeft !== null && secondsLeft < 30 ? "error" : "primary"}
-          variant="outlined"
-          sx={{ fontWeight: "bold", fontSize: "1rem", px: 1 }}
-        />
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<StopCircleIcon />}
-          onClick={onEndSession}
-          size="small"
-        >
-          End Session
-        </Button>
-      </Stack>
+  const timerUrgent = secondsLeft !== null && secondsLeft < 30;
 
-      {/* Push-to-talk button */}
-      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", my: 2 }}>
-        <Button
-          variant="contained"
-          color={isTalking ? "secondary" : "primary"}
-          disabled={disabled}
-          onPointerDown={onPressTalk}
-          onPointerUp={onReleaseTalk}
-          onPointerCancel={onReleaseTalk}
-          onPointerLeave={onReleaseTalk}
-          sx={{
-            width: 140,
-            height: 140,
-            borderRadius: "50%",
-            boxShadow: isTalking
-              ? "0 0 24px rgba(255, 64, 129, 0.6)"
-              : "0 4px 14px rgba(0, 0, 0, 0.2)",
-            transform: isTalking ? "scale(0.96)" : "scale(1)",
-            transition: "all 0.15s ease",
-            display: "flex",
-            flexDirection: "column",
-            gap: 1,
-            userSelect: "none",
-            touchAction: "none",
-          }}
+  return (
+    <Box
+      component="section"
+      aria-label="Voice controls"
+      sx={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: "var(--vfsb-footer-height)",
+        height: VOICE_DOCK_HEIGHT,
+        zIndex: (theme) => theme.zIndex.appBar,
+        bgcolor: "background.paper",
+        borderTop: 1,
+        borderColor: "divider",
+        boxShadow: (theme) =>
+          theme.palette.mode === "dark"
+            ? "0 -8px 24px rgba(0, 0, 0, 0.5)"
+            : "0 -8px 24px rgba(15, 23, 42, 0.08)",
+      }}
+    >
+      <Container maxWidth="md" sx={{ height: "100%" }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={{ xs: 1, sm: 2 }}
+          sx={{ height: "100%" }}
         >
-          <MicIcon sx={{ fontSize: 48 }} />
-          <Typography variant="button" sx={{ fontSize: "0.85rem", fontWeight: "bold" }}>
-            {isTalking ? "Listening..." : "Hold to Answer"}
-          </Typography>
-        </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5 }}>
-          Hold button or press Space to speak your answer • Release when done
-        </Typography>
-      </Box>
+          {/* Countdown */}
+          <Chip
+            icon={<TimerIcon />}
+            label={formatSeconds(secondsLeft)}
+            color={timerUrgent ? "error" : "default"}
+            variant="outlined"
+            sx={{
+              fontWeight: 600,
+              fontVariantNumeric: "tabular-nums",
+              minWidth: 84,
+            }}
+            aria-label={`${formatSeconds(secondsLeft)} remaining`}
+          />
+
+          {/* Push-to-talk */}
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
+            <Button
+              variant="contained"
+              color={isTalking ? "secondary" : "primary"}
+              disabled={disabled || !isActive}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                onPressTalk();
+              }}
+              onPointerUp={onReleaseTalk}
+              onPointerCancel={onReleaseTalk}
+              onPointerLeave={onReleaseTalk}
+              onContextMenu={(e) => e.preventDefault()}
+              aria-pressed={isTalking}
+              aria-label={isTalking ? "Listening, release to finish" : "Hold to answer"}
+              sx={{
+                width: 72,
+                height: 72,
+                minWidth: 72,
+                borderRadius: "50%",
+                flexShrink: 0,
+                boxShadow: (theme) =>
+                  isTalking
+                    ? `0 0 0 8px ${theme.palette.secondary.main}33`
+                    : theme.shadows[4],
+                transform: isTalking ? "scale(0.94)" : "scale(1)",
+                transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                userSelect: "none",
+                touchAction: "none",
+                WebkitTouchCallout: "none",
+              }}
+            >
+              <MicIcon sx={{ fontSize: 34 }} />
+            </Button>
+            <Box sx={{ display: { xs: "none", sm: "block" } }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                {isTalking ? "Listening…" : "Hold to answer"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {isTalking ? "Release when you're done" : "Hold the button or press Space"}
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* End session */}
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<StopCircleIcon />}
+            onClick={onEndSession}
+            size="small"
+            sx={{ flexShrink: 0, minWidth: 84 }}
+          >
+            End
+          </Button>
+        </Stack>
+      </Container>
     </Box>
   );
 }

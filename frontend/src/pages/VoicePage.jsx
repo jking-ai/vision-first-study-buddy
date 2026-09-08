@@ -14,16 +14,16 @@ import {
   MenuItem,
   Stack,
   Chip,
-  Divider,
 } from "@mui/material";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 
 import { useVoiceSession } from "../hooks/useVoiceSession";
 import { getSavedStudyGuides } from "../utils/studyGuideStorage";
-import VoiceControls from "../components/VoiceControls";
+import VoiceControls, { VOICE_DOCK_HEIGHT } from "../components/VoiceControls";
 import VoiceTranscript from "../components/VoiceTranscript";
 import VoiceScorePanel from "../components/VoiceScorePanel";
 
@@ -73,6 +73,7 @@ export function VoicePage() {
   const remainingToday = status?.remaining_today ?? 0;
   const isEnabled = status?.enabled ?? false;
   const canStartSession = isEnabled && remainingToday > 0 && !!activeStudyGuide;
+  const isLive = state === "ready" || state === "talking";
 
   const endedReasonText = useMemo(() => {
     switch (endedReason) {
@@ -126,6 +127,64 @@ export function VoicePage() {
     );
   }
 
+  // Live session: compact header, conversation in page flow, controls docked
+  // to the bottom of the viewport (see VoiceControls).
+  if (isLive) {
+    return (
+      <>
+        <Container
+          maxWidth="md"
+          sx={{ mt: 3, pb: `${VOICE_DOCK_HEIGHT + 24}px` }}
+        >
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            spacing={2}
+            sx={{ mb: 2 }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h2" component="h1" noWrap>
+                Voice Coach
+              </Typography>
+              <Typography variant="body2" color="text.secondary" noWrap>
+                {activeStudyGuide?.title}
+              </Typography>
+            </Box>
+            <Chip
+              icon={<GraphicEqIcon />}
+              label={state === "talking" ? "Listening" : "Live"}
+              color={state === "talking" ? "secondary" : "success"}
+              variant="outlined"
+              sx={{ fontWeight: 600, flexShrink: 0 }}
+            />
+          </Stack>
+
+          {(score || answers.length > 0 || quizSummary) && (
+            <Box sx={{ mb: 2 }}>
+              <VoiceScorePanel
+                score={score}
+                answers={answers}
+                quizSummary={quizSummary}
+                collapsible
+              />
+            </Box>
+          )}
+
+          <VoiceTranscript transcript={transcript} autoScroll />
+        </Container>
+
+        <VoiceControls
+          state={state}
+          secondsLeft={secondsLeft}
+          onPressTalk={pressTalk}
+          onReleaseTalk={releaseTalk}
+          onEndSession={end}
+        />
+      </>
+    );
+  }
+
   return (
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       {/* Header */}
@@ -147,10 +206,10 @@ export function VoicePage() {
 
         {/* Status indicator strip */}
         <Chip
-          label={`Voice sessions left today: ${remainingToday}`}
+          label={`Sessions left today: ${remainingToday}`}
           color={remainingToday > 0 ? "primary" : "default"}
           variant="outlined"
-          sx={{ fontWeight: "bold" }}
+          sx={{ fontWeight: 600, flexShrink: 0 }}
         />
       </Stack>
 
@@ -185,7 +244,6 @@ export function VoicePage() {
         </FormControl>
       )}
 
-      {/* Main interaction Card */}
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 4 }, mb: 3 }}>
         {/* State: Idle / Ready to start */}
         {state === "idle" && (
@@ -204,12 +262,12 @@ export function VoicePage() {
               startIcon={<RecordVoiceOverIcon />}
               onClick={start}
               disabled={!canStartSession}
-              sx={{ px: 4, py: 1.8, fontSize: "1.2rem", fontWeight: "bold" }}
+              sx={{ px: 4, py: 1.8, fontSize: "1.2rem" }}
             >
               Start Voice Quiz
             </Button>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2, maxWidth: 480, mx: "auto" }}>
-              The coach will speak right away to introduce the quiz and ask Question 1 out loud. Hold the microphone button to reply.
+              The coach will introduce the quiz and ask Question 1 out loud. Hold the microphone button to reply.
             </Typography>
           </Box>
         )}
@@ -224,37 +282,11 @@ export function VoicePage() {
           </Box>
         )}
 
-        {/* State: Active session (ready or talking) */}
-        {(state === "ready" || state === "talking") && (
-          <Box>
-            <VoiceControls
-              state={state}
-              secondsLeft={secondsLeft}
-              onPressTalk={pressTalk}
-              onReleaseTalk={releaseTalk}
-              onEndSession={end}
-            />
-
-            <Divider sx={{ my: 3 }} />
-
-            <VoiceScorePanel
-              score={score}
-              answers={answers}
-              quizSummary={quizSummary}
-            />
-
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Live Transcript
-            </Typography>
-            <VoiceTranscript transcript={transcript} />
-          </Box>
-        )}
-
         {/* State: Ended */}
         {state === "ended" && (
-          <Box sx={{ py: 2 }}>
+          <Box>
             <Alert severity="success" sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                 {endedReasonText}
               </Typography>
             </Alert>
@@ -265,12 +297,12 @@ export function VoicePage() {
               quizSummary={quizSummary}
             />
 
-            <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>
-              Session Transcript
+            <Typography variant="subtitle2" sx={{ mb: 1.5, mt: 3 }}>
+              Session transcript
             </Typography>
             <VoiceTranscript transcript={transcript} />
 
-            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 3 }}>
               {canStartSession && (
                 <Button
                   variant="contained"

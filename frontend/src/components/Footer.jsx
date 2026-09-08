@@ -11,7 +11,7 @@ const STATUS = {
 };
 
 const statusConfig = {
-  [STATUS.CHECKING]: { color: "grey.500", ping: true, text: "Checking API..." },
+  [STATUS.CHECKING]: { color: "text.disabled", ping: true, text: "Checking API..." },
   [STATUS.WARMING]: { color: "warning.main", ping: true, text: "API warming up..." },
   [STATUS.ONLINE]: { color: "success.main", ping: false, text: "API online" },
   [STATUS.OFFLINE]: { color: "error.main", ping: false, text: "API offline" },
@@ -55,30 +55,33 @@ function Footer() {
         bottom: 0,
         left: 0,
         right: 0,
+        height: "var(--vfsb-footer-height)",
         borderTop: 1,
         borderColor: "divider",
         bgcolor: "background.paper",
-        backdropFilter: "blur(8px)",
-        zIndex: 1100,
+        zIndex: (theme) => theme.zIndex.appBar,
         px: 2,
-        py: 1,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 2,
       }}
     >
       {/* Inspirational quote */}
       <Typography
         variant="caption"
         color="text.secondary"
-        sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+        noWrap
+        sx={{ display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}
       >
-        <SpaIcon sx={{ fontSize: 14, color: "success.main" }} />
-        Keep asking questions — that's how you grow.
+        <SpaIcon sx={{ fontSize: 14, color: "success.main", flexShrink: 0 }} />
+        <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          Keep asking questions — that's how you grow.
+        </Box>
       </Typography>
 
       {/* Status indicator */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
         {/* Animated dot */}
         <Box sx={{ position: "relative", width: 10, height: 10 }}>
           {/* Ping ring */}
@@ -109,7 +112,7 @@ function Footer() {
             }}
           />
         </Box>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" noWrap>
           {text}
         </Typography>
       </Box>
