@@ -20,6 +20,36 @@ describe("voiceProtocol", () => {
     expect(nextState.sessionId).toBe("vs_12345678");
   });
 
+  it("marks the previous speaker's entry complete when a new speaker starts", () => {
+    let state = initialVoiceState;
+    state = reduceVoiceMessage(state, { type: "transcript", role: "user", text: "Cytoplasm" });
+    expect(state.transcript[0].completed).toBe(false);
+    state = reduceVoiceMessage(state, { type: "transcript", role: "coach", text: "Right." });
+    expect(state.transcript.length).toBe(2);
+    expect(state.transcript[0].completed).toBe(true);
+    expect(state.transcript[1].completed).toBe(false);
+  });
+
+  it("time_up zeroes the clock and locks input without ending the session", () => {
+    let state = reduceVoiceMessage(initialVoiceState, {
+      type: "ready",
+      session_id: "vs_1",
+      max_duration_s: 180,
+    });
+    state = reduceVoiceMessage(state, { type: "time_up", grace_s: 30 });
+    expect(state.state).toBe("ready");
+    expect(state.secondsLeft).toBe(0);
+    expect(state.inputLocked).toBe(true);
+  });
+
+  it("ended completes every transcript entry", () => {
+    let state = initialVoiceState;
+    state = reduceVoiceMessage(state, { type: "transcript", role: "coach", text: "Bye" });
+    state = reduceVoiceMessage(state, { type: "ended", reason: "max_duration" });
+    expect(state.state).toBe("ended");
+    expect(state.transcript.every((e) => e.completed)).toBe(true);
+  });
+
   it("merges two consecutive coach transcripts into one line", () => {
     let state = initialVoiceState;
     state = reduceVoiceMessage(state, {

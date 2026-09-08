@@ -27,7 +27,7 @@ export function VoiceControls({
   disabled = false,
 }) {
   const isTalking = state === "talking";
-  const isActive = state === "ready" || state === "talking";
+  const isActive = (state === "ready" || state === "talking") && !disabled;
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -60,6 +60,12 @@ export function VoiceControls({
   }, [handleKeyDown, handleKeyUp]);
 
   const timerUrgent = secondsLeft !== null && secondsLeft < 30;
+  const title = disabled ? "Time's up" : isTalking ? "Listening…" : "Hold to answer";
+  const hint = disabled
+    ? "The coach is finishing up"
+    : isTalking
+      ? "Release when you're done"
+      : "Hold the button or press Space";
 
   return (
     <Box
@@ -105,7 +111,7 @@ export function VoiceControls({
             <Button
               variant="contained"
               color={isTalking ? "secondary" : "primary"}
-              disabled={disabled || !isActive}
+              disabled={!isActive}
               onPointerDown={(e) => {
                 e.preventDefault();
                 onPressTalk();
@@ -115,7 +121,9 @@ export function VoiceControls({
               onPointerLeave={onReleaseTalk}
               onContextMenu={(e) => e.preventDefault()}
               aria-pressed={isTalking}
-              aria-label={isTalking ? "Listening, release to finish" : "Hold to answer"}
+              aria-label={
+                disabled ? "Time's up" : isTalking ? "Listening, release to finish" : "Hold to answer"
+              }
               sx={{
                 width: 72,
                 height: 72,
@@ -137,10 +145,10 @@ export function VoiceControls({
             </Button>
             <Box sx={{ display: { xs: "none", sm: "block" } }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-                {isTalking ? "Listening…" : "Hold to answer"}
+                {title}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {isTalking ? "Release when you're done" : "Hold the button or press Space"}
+                {hint}
               </Typography>
             </Box>
           </Stack>

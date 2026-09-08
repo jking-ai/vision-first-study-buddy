@@ -54,12 +54,13 @@ The backend is deployed to Cloud Run with `allUsers` invoker — i.e., the publi
 
   Health, list, and get-by-id endpoints are not rate limited. Limits live in `app/rate_limit.py`.
 - **Voice Mode session caps** enforced in-process via `VoiceSessionGuard` (`--max-instances=1`):
-  - Max duration: 180 seconds (3 minutes) per session
+  - Max duration: 180 seconds (3 minutes) per session. At the limit, student input is locked and the coach may finish its current turn for up to 30 more seconds (`VOICE_END_GRACE_SECONDS`) before the session ends.
   - Device daily limit: 2 sessions per device per UTC day (keyed by `device_id`)
   - Global daily limit: 20 sessions per UTC day
   - Concurrency limit: 2 active sessions simultaneously
   - Inbound audio quota: 16,000 * 2 * 180 bytes per session
   - Idle timeout: 45 seconds without client activity
+  - Pacing: after the coach's feedback on an answer, the server waits 2.5 seconds (`VOICE_NEXT_QUESTION_PAUSE_SECONDS`) before prompting it to ask the next question
 - **Docs disabled in production**: `DOCS_ENABLED=false` (default) sets `docs_url`, `redoc_url`, and `openapi_url` to `None`, so the API surface map is not advertised on the public URL.
 - **CORS**: `allowed_origins` defaults to an empty list in code. Production must set `ALLOWED_ORIGINS` explicitly to the prod web app origins.
 - **Budget alert**: a GCP budget alert is configured separately to notify on Vertex AI / Cloud Run spend.
