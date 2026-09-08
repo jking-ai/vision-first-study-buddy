@@ -21,6 +21,7 @@ import {
   TableRow,
   Paper,
   Button,
+  Alert,
 } from "@mui/material";
 import ImageIcon from "@mui/icons-material/Image";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
@@ -68,6 +69,7 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const handleOpenDelete = (e, material) => {
     e.stopPropagation();
@@ -78,16 +80,19 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
   const handleCloseDelete = () => {
     setDeleteOpen(false);
     setMaterialToDelete(null);
+    setDeleteError(null);
   };
 
   const handleConfirmDelete = async () => {
     if (!materialToDelete || !onDelete) return;
     setDeleteLoading(true);
+    setDeleteError(null);
     try {
       await onDelete(materialToDelete.id);
       handleCloseDelete();
     } catch (err) {
       console.error("Failed to delete material:", err);
+      setDeleteError(err.message || "Delete failed.");
     } finally {
       setDeleteLoading(false);
     }
@@ -387,6 +392,11 @@ function MaterialList({ materials, selectedIds, onSelectionChange, loading, onDe
             </strong>
             ? This will remove it from Firebase Storage.
           </Typography>
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              Could not delete: {deleteError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDelete} disabled={deleteLoading}>
