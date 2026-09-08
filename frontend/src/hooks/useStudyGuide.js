@@ -10,14 +10,18 @@ import {
 /**
  * Custom hook for study guide generation, saving, and retrieval.
  *
+ * Every generated guide is saved to localStorage the moment it arrives, named
+ * by its title. Generation is the expensive step (a rate-limited Gemini call);
+ * saving is free, so nothing is ever lost by navigating away.
+ *
  * @returns {{
  *   generate: Function,
  *   studyGuide: object|null,
+ *   currentEntry: object|null,  // the saved entry backing the guide in view
  *   loading: boolean,
  *   error: string|null,
  *   reset: Function,
  *   savedGuides: Array,
- *   save: Function,
  *   loadSaved: Function,
  *   deleteSaved: Function,
  *   renameSaved: Function,
@@ -26,6 +30,7 @@ import {
  */
 export function useStudyGuide() {
   const [studyGuide, setStudyGuide] = useState(null);
+  const [currentEntryId, setCurrentEntryId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [savedGuides, setSavedGuides] = useState([]);
@@ -48,6 +53,10 @@ export function useStudyGuide() {
         detailLevel || "standard"
       );
       setStudyGuide(data.study_guide);
+      // Auto-save: generation is the costly step, storage is free.
+      const id = saveToStorage(data.study_guide, data.study_guide.title);
+      setCurrentEntryId(id);
+      refreshSaved();
       return data;
     } catch (err) {
       setError(err.message);
@@ -59,26 +68,24 @@ export function useStudyGuide() {
 
   const reset = () => {
     setStudyGuide(null);
+    setCurrentEntryId(null);
     setError(null);
-  };
-
-  const save = (guide, displayName) => {
-    const guideToSave = guide || studyGuide;
-    if (!guideToSave) return null;
-    const id = saveToStorage(guideToSave, displayName || guideToSave.title);
-    refreshSaved();
-    return id;
   };
 
   const loadSaved = (savedEntry) => {
     if (savedEntry?.studyGuide) {
       setStudyGuide(savedEntry.studyGuide);
+      setCurrentEntryId(savedEntry.id);
       setError(null);
     }
   };
 
   const deleteSaved = (id) => {
     deleteFromStorage(id);
+    if (id === currentEntryId) {
+      setStudyGuide(null);
+      setCurrentEntryId(null);
+    }
     refreshSaved();
   };
 
@@ -87,14 +94,16 @@ export function useStudyGuide() {
     refreshSaved();
   };
 
+  const currentEntry = savedGuides.find((g) => g.id === currentEntryId) || null;
+
   return {
     generate,
     studyGuide,
+    currentEntry,
     loading,
     error,
     reset,
     savedGuides,
-    save,
     loadSaved,
     deleteSaved,
     renameSaved,

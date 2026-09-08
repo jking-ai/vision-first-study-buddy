@@ -25,7 +25,6 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
-import SaveIcon from "@mui/icons-material/Save";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -46,8 +45,8 @@ function StudyGuidePage() {
     loading,
     error,
     reset,
+    currentEntry,
     savedGuides,
-    save,
     loadSaved,
     deleteSaved,
     renameSaved,
@@ -56,46 +55,23 @@ function StudyGuidePage() {
   const [selectedIds, setSelectedIds] = useState(passedIds);
   const [focusTopics, setFocusTopics] = useState("");
   const [detailLevel, setDetailLevel] = useState("standard");
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [saveName, setSaveName] = useState("");
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameName, setRenameName] = useState("");
-  const [viewingSaved, setViewingSaved] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (selectedIds.length === 0) return;
     const topics = focusTopics
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
-    generate(selectedIds, topics, detailLevel);
-    setViewingSaved(false);
-  };
-
-  const handleSave = () => {
-    if (studyGuide) {
-      setSaveName(studyGuide.title);
-      setSaveDialogOpen(true);
-    }
-  };
-
-  const handleConfirmSave = () => {
-    save(studyGuide, saveName);
-    setSaveDialogOpen(false);
-    setSaveName("");
-    setSaveSuccess(true);
-    // Return to the main study guide view after a short delay
-    setTimeout(() => {
-      reset();
-      setViewingSaved(false);
-    }, 1500);
+    const data = await generate(selectedIds, topics, detailLevel);
+    if (data) setSavedNotice(true);
   };
 
   const handleViewSaved = (entry) => {
     loadSaved(entry);
-    setViewingSaved(true);
   };
 
   const handleOpenRename = (entry) => {
@@ -118,21 +94,50 @@ function StudyGuidePage() {
 
   const handleReset = () => {
     reset();
-    setViewingSaved(false);
   };
+
+  const renameDialog = (
+    <Dialog open={renameDialogOpen} onClose={() => setRenameDialogOpen(false)} maxWidth="sm" fullWidth>
+      <DialogTitle>Rename Study Guide</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          fullWidth
+          label="Display Name"
+          value={renameName}
+          onChange={(e) => setRenameName(e.target.value)}
+          sx={{ mt: 1 }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleConfirmRename();
+          }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setRenameDialogOpen(false)}>Cancel</Button>
+        <Button variant="contained" onClick={handleConfirmRename}>
+          Save
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 
   if (studyGuide) {
     return (
       <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{ mb: 2 }}
+        >
           <Button onClick={handleReset}>Generate Another</Button>
-          {!viewingSaved && (
+          {currentEntry && (
             <Button
               variant="outlined"
-              startIcon={<SaveIcon />}
-              onClick={handleSave}
+              startIcon={<EditIcon />}
+              onClick={() => handleOpenRename(currentEntry)}
             >
-              Save
+              Rename
             </Button>
           )}
           <Button
@@ -144,30 +149,43 @@ function StudyGuidePage() {
             Talk it out
           </Button>
         </Stack>
+        {currentEntry && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Saved to your study guides as <strong>{currentEntry.displayName}</strong>.
+          </Typography>
+        )}
         <StudyGuideView studyGuide={studyGuide} />
 
-        <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Save Study Guide</DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              fullWidth
-              label="Display Name"
-              value={saveName}
-              onChange={(e) => setSaveName(e.target.value)}
-              sx={{ mt: 1 }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleConfirmSave();
-              }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
-            <Button variant="contained" onClick={handleConfirmSave}>
-              Save
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {renameDialog}
+
+        <Snackbar
+          open={savedNotice}
+          autoHideDuration={5000}
+          onClose={() => setSavedNotice(false)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
+            severity="success"
+            variant="filled"
+            onClose={() => setSavedNotice(false)}
+            action={
+              currentEntry && (
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={() => {
+                    setSavedNotice(false);
+                    handleOpenRename(currentEntry);
+                  }}
+                >
+                  Rename
+                </Button>
+              )
+            }
+          >
+            Study guide saved.
+          </Alert>
+        </Snackbar>
       </Container>
     );
   }
@@ -289,39 +307,7 @@ function StudyGuidePage() {
         </>
       )}
 
-      <Dialog open={renameDialogOpen} onClose={() => setRenameDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Rename Study Guide</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Display Name"
-            value={renameName}
-            onChange={(e) => setRenameName(e.target.value)}
-            sx={{ mt: 1 }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleConfirmRename();
-            }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRenameDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleConfirmRename}>
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={saveSuccess}
-        autoHideDuration={3000}
-        onClose={() => setSaveSuccess(false)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity="success" variant="filled" onClose={() => setSaveSuccess(false)}>
-          Study guide saved! Returning to your saved guides...
-        </Alert>
-      </Snackbar>
+      {renameDialog}
     </Container>
   );
 }
