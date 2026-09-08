@@ -4,8 +4,8 @@
 
 export const ERROR_MESSAGES = {
   DEVICE_DAILY_LIMIT: "You've used today's voice sessions on this device. Come back tomorrow.",
-  GLOBAL_DAILY_LIMIT: "The voice coach is fully booked today. Try again tomorrow.",
-  CONCURRENT_LIMIT: "The coach is busy with other students right now. Try again in a few minutes.",
+  GLOBAL_DAILY_LIMIT: "The tutor is fully booked today. Try again tomorrow.",
+  CONCURRENT_LIMIT: "The tutor is busy with other students right now. Try again in a few minutes.",
   AUDIO_QUOTA_EXCEEDED: "This session sent more audio than allowed and was ended.",
   VOICE_DISABLED: "Voice mode is turned off right now.",
   START_TIMEOUT: "The connection timed out before the session started.",
@@ -56,7 +56,7 @@ export const initialVoiceState = {
   secondsLeft: null,
   sessionId: null,
   voice: "Kore",
-  transcript: [], // [{ role: "user" | "coach", text: string, completed: boolean }]
+  transcript: [], // [{ role: "user" | "coach", text: string, completed: boolean }] ("coach" is the wire name for the tutor)
   inputLocked: false, // true once the time limit hits; the coach may still finish speaking
   clearPlayback: false,
   answers: [], // [{ index, question, student_answer, correct, feedback }]

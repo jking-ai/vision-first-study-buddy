@@ -44,7 +44,7 @@ Students accumulate study materials in many formats -- handwritten lecture notes
 6. **Mobile Usability:** The camera capture feature works on iOS Safari and Android Chrome, allowing students to snap and upload notes in under 5 seconds.
 7. **Deployable:** The backend runs on Cloud Run and the frontend is hosted on Firebase Hosting, both accessible via public URLs.
 8. **Portfolio-Ready:** The project README, architecture docs, and live demo clearly communicate the multimodal engineering decisions to a technical reviewer.
-9. **Voice Quiz Scoring:** Voice quiz records a scored result in quiz history, providing an interactive oral study experience powered by the Gemini Live API.
+9. **Talking Tutor:** Say your answers out loud. The tutor asks questions from your study guide, replies with spoken feedback, and records a scored result in quiz history. Powered by the Gemini Live API.
 
 ## Documentation
 

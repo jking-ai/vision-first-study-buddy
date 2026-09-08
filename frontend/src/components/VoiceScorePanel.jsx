@@ -17,7 +17,7 @@ import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 /**
- * Oral quiz progress: score chip, coach summary, and per-answer feedback.
+ * Quiz progress: score chip, tutor summary, and per-answer feedback.
  *
  * Pass `collapsible` during a live session so the answer list starts folded
  * and the conversation stays front and centre; it expands automatically when
@@ -92,7 +92,7 @@ export function VoiceScorePanel({ score, answers = [], quizSummary, collapsible 
       >
         <Box>
           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-            Oral quiz progress
+            Quiz progress
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {answered} of {total} answered
@@ -128,7 +128,7 @@ export function VoiceScorePanel({ score, answers = [], quizSummary, collapsible 
           {quizSummary && (
             <Alert severity="info" sx={{ mb: answers.length > 0 ? 2 : 0 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Coach summary
+                Tutor summary
               </Typography>
               <Typography variant="body2">{quizSummary}</Typography>
             </Alert>

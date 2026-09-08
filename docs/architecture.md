@@ -100,7 +100,7 @@ sequenceDiagram
     FE-->>U: Show score and explanations
 ```
 
-### Voice Coach Interactive Quiz Flow
+### Talking Tutor Interactive Quiz Flow
 
 ```mermaid
 sequenceDiagram
@@ -238,7 +238,7 @@ backend/
     prompts/
       study_guide_template.txt      # System instruction template for study guide generation
       quiz_template.txt             # System instruction template for quiz generation
-      voice_coach_template.txt      # System instruction template for oral quiz voice coach
+      voice_coach_template.txt      # System instruction template for the Talking Tutor
   scripts/
     voice_smoke.py                  # Smoke test for WebSocket live relay
   tests/
@@ -277,9 +277,9 @@ frontend/
     pages/
       HomePage.jsx                  # Landing page with upload CTA and 4 step cards
       MaterialsPage.jsx             # Material management and selection view
-      StudyGuidePage.jsx            # Study guide generation and "Quiz me by voice" CTA
+      StudyGuidePage.jsx            # Study guide generation and "Talk it out" CTA
       QuizPage.jsx                  # Quiz generation, taking, results, and voice history chip
-      VoicePage.jsx                 # Voice Coach session interface
+      VoicePage.jsx                 # Talking Tutor session interface
     hooks/
       useUpload.js                  # Custom hook for file upload with progress tracking
       useStudyGuide.js              # Custom hook for study guide generation with loading state
