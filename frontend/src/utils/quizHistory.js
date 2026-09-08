@@ -35,6 +35,7 @@ export function saveQuizResult(result) {
     score: result.score,
     total: result.total,
     percentage: result.percentage,
+    mode: result.mode || "written",
     date: new Date().toISOString(),
   };
   

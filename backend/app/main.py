@@ -7,7 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import get_settings
 from app.rate_limit import limiter, rate_limit_exceeded_handler
-from app.routers import health, materials, quizzes, study_guides, upload
+from app.routers import health, materials, quizzes, study_guides, upload, voice
 
 
 def create_app() -> FastAPI:
@@ -53,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(materials.router, prefix="/api/v1", tags=["materials"])
     app.include_router(study_guides.router, prefix="/api/v1", tags=["study-guides"])
     app.include_router(quizzes.router, prefix="/api/v1", tags=["quizzes"])
+    app.include_router(voice.router, prefix="/api/v1", tags=["voice"])
 
     return app
 

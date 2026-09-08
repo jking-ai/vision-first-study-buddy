@@ -34,6 +34,8 @@ docker run -p 8000:8000 \
 - `FIREBASE_STORAGE_BUCKET` — Firebase Storage bucket (required; app fails to start without it)
 - `ALLOWED_ORIGINS` — JSON list (or comma-separated) of permitted CORS origins. Default in code is empty (non-permissive); set this even for local dev.
 - `DOCS_ENABLED` — Set to `true` only in local dev to expose `/docs` and `/redoc`. Default `false` in production.
+- `VOICE_ENABLED` — Set to `true` to enable Voice Coach (default `false`).
+- `GEMINI_LIVE_API_KEY` — Google AI Studio Gemini API key for Gemini Live API (required when `VOICE_ENABLED=true`).
 
 See `backend/.env.example` for all variables.
 
@@ -51,6 +53,13 @@ The backend is deployed to Cloud Run with `allUsers` invoker — i.e., the publi
   | `POST /api/v1/materials/upload`         | 10         | 100     |
 
   Health, list, and get-by-id endpoints are not rate limited. Limits live in `app/rate_limit.py`.
+- **Voice Mode session caps** enforced in-process via `VoiceSessionGuard` (`--max-instances=1`):
+  - Max duration: 180 seconds (3 minutes) per session
+  - Device daily limit: 2 sessions per device per UTC day (keyed by `device_id`)
+  - Global daily limit: 20 sessions per UTC day
+  - Concurrency limit: 2 active sessions simultaneously
+  - Inbound audio quota: 16,000 * 2 * 180 bytes per session
+  - Idle timeout: 45 seconds without client activity
 - **Docs disabled in production**: `DOCS_ENABLED=false` (default) sets `docs_url`, `redoc_url`, and `openapi_url` to `None`, so the API surface map is not advertised on the public URL.
 - **CORS**: `allowed_origins` defaults to an empty list in code. Production must set `ALLOWED_ORIGINS` explicitly to the prod web app origins.
 - **Budget alert**: a GCP budget alert is configured separately to notify on Vertex AI / Cloud Run spend.
@@ -66,10 +75,10 @@ npm test                           # Run tests
 ```
 
 **Frontend architecture:**
-- **Pages:** HomePage, MaterialsPage, StudyGuidePage, QuizPage
-- **Components:** TopNav, MaterialUpload (drag-drop), MaterialList (card grid with selection), CameraCapture (MediaDevices API), StudyGuideView (accordion sections), QuizView (taking + results modes)
-- **Hooks:** useMaterials (fetch/refresh list), useUpload (validation + upload), useStudyGuide (generation), useQuiz (generation + submission)
-- **Cross-page state:** Router state (`navigate('/path', { state: { selectedIds } })`) passes material selections between pages
+- **Pages:** HomePage, MaterialsPage, StudyGuidePage, QuizPage, VoicePage
+- **Components:** TopNav, MaterialUpload (drag-drop), MaterialList (card grid with selection), CameraCapture (MediaDevices API), StudyGuideView (accordion sections), QuizView (taking + results modes), VoiceControls (push-to-talk + countdown), VoiceTranscript (live speaker transcript), VoiceScorePanel (score chip + oral answer feedback)
+- **Hooks:** useMaterials (fetch/refresh list), useUpload (validation + upload), useStudyGuide (generation), useQuiz (generation + submission), useVoiceSession (audio worklet mic capture, 24kHz playback queue, Live API relay)
+- **Cross-page state:** Router state (`navigate('/path', { state: { selectedIds, studyGuide } })`) passes material and study guide selections between pages
 
 ### Deployment
 ```bash
@@ -79,7 +88,9 @@ gcloud run deploy vision-first-study-buddy \
   --region us-central1 \
   --project <your-gcp-project> \
   --allow-unauthenticated \
-  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"]"
+  --timeout 300 \
+  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"],VOICE_ENABLED=true" \
+  --set-secrets "GEMINI_LIVE_API_KEY=study-buddy-gemini-live-api-key:latest"
 
 # Frontend: build and deploy to Firebase Hosting
 cd frontend
@@ -91,13 +102,14 @@ firebase deploy --only hosting:study-buddy --project <your-gcp-project>
 ## Architecture
 
 ### Request Flow
-`Browser (mobile/desktop)` -> `Firebase Hosting (React + MUI SPA)` -> `FastAPI (Cloud Run)` -> `Firebase Storage (file hosting)` + `Vertex AI Gemini 3.1 Pro (multimodal processing)` -> Structured JSON response -> `Frontend renders study guide / quiz`
+`Browser (mobile/desktop)` -> `Firebase Hosting (React + MUI SPA)` -> `FastAPI (Cloud Run)` -> `Firebase Storage (file hosting)` + `Vertex AI Gemini 3.1 Pro (multimodal processing)` / `Gemini Live API (bidirectional voice)` -> Structured JSON / Audio stream -> `Frontend renders study guide / quiz / voice coach`
 
 ### Key Design Decisions
 - **Multimodal input:** Sends images and PDFs directly to Gemini 3.1 Pro as multimodal content parts. No separate OCR pipeline -- Gemini handles text extraction, diagram recognition, and content understanding in a single pass.
 - **Long-context processing:** Leverages Gemini's 1M token context window to process multiple uploaded materials simultaneously, avoiding the complexity of chunking or vector-based RAG.
 - **Firebase Storage:** Uploaded files are stored in Firebase Storage buckets, providing CDN-backed access and persistent URLs that can be passed to the Gemini API.
 - **Mobile-first camera capture:** The frontend integrates with the device camera via the MediaDevices API, allowing students to snap photos of notes directly within the app.
+- **Voice Coach relay:** Push-to-talk oral quizzes over study guides using Gemini Live API (`gemini-3.1-flash-live-preview`), streaming 16kHz PCM audio in and 24kHz PCM out with server-side spend caps and real-time answer scoring.
 - **No database:** Materials are stored in Firebase Storage with metadata in the file path structure. Generated study guides and quizzes are returned to the client and not persisted. This keeps the architecture simple for a portfolio project.
 
 ### API Endpoints
@@ -109,6 +121,8 @@ firebase deploy --only hosting:study-buddy --project <your-gcp-project>
 - `POST /api/v1/quizzes/generate` -- Generate a quiz from selected materials
 - `GET /api/v1/quizzes/{id}` -- Retrieve a generated quiz
 - `POST /api/v1/quizzes/{id}/submit` -- Submit quiz answers for grading
+- `GET /api/v1/voice/status` -- Get voice mode status, availability, and remaining sessions
+- `WS /api/v1/voice/session` -- Bidirectional WebSocket relay for Voice Coach sessions
 - `GET /api/v1/health` -- Health check and service metadata
 
 ## Environment Setup

@@ -1,0 +1,37 @@
+{
+  "id": "sg_test_12345",
+  "title": "Photosynthesis and Cellular Respiration",
+  "summary": "A comprehensive study guide covering the mechanics of photosynthesis, light-dependent reactions, the Calvin cycle, and cellular respiration.",
+  "sections": [
+    {
+      "heading": "Light-Dependent Reactions",
+      "content": "Light-dependent reactions take place in the thylakoid membrane of chloroplasts. Chlorophyll absorbs solar photons to excite electrons, splitting water molecules into oxygen, protons, and electrons.",
+      "key_terms": [
+        {
+          "term": "Chlorophyll",
+          "definition": "The primary green pigment in plants that absorbs sunlight."
+        },
+        {
+          "term": "Thylakoid",
+          "definition": "Membrane-bound compartments inside chloroplasts where light reactions occur."
+        }
+      ]
+    },
+    {
+      "heading": "The Calvin Cycle",
+      "content": "The Calvin cycle takes place in the stroma of chloroplasts, using ATP and NADPH produced by the light reactions to convert carbon dioxide into glucose.",
+      "key_terms": [
+        {
+          "term": "RuBisCO",
+          "definition": "The enzyme responsible for fixing carbon dioxide in the Calvin cycle."
+        },
+        {
+          "term": "Stroma",
+          "definition": "The fluid-filled space surrounding the grana in chloroplasts."
+        }
+      ]
+    }
+  ],
+  "source_materials": ["bio_notes_1.jpg", "photosynthesis.pdf"],
+  "generated_at": "2026-09-08T12:00:00Z"
+}

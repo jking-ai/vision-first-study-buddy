@@ -58,6 +58,7 @@ def clear_settings_cache():
     from app.dependencies import _cached_gemini_client
     from app.main import app
     from app.rate_limit import limiter
+    from app.services.voice_guard import guard
 
     get_settings.cache_clear()
     _cached_gemini_client.cache_clear()
@@ -65,8 +66,10 @@ def clear_settings_cache():
     # Reset slowapi's in-memory storage so a previous test's hits don't bleed
     # into the next one.
     limiter.reset()
+    guard.reset()
     yield
     get_settings.cache_clear()
     _cached_gemini_client.cache_clear()
     app.dependency_overrides.clear()
     limiter.reset()
+    guard.reset()

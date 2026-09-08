@@ -100,6 +100,48 @@ sequenceDiagram
     FE-->>U: Show score and explanations
 ```
 
+### Voice Coach Interactive Quiz Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User Browser
+    participant FE as React Frontend (VoicePage)
+    participant API as FastAPI Cloud Run Relay
+    participant LIVE as Gemini Live API (Google GenAI)
+
+    U->>FE: Click "Start Session" (user gesture creates AudioContexts)
+    FE->>API: WS /api/v1/voice/session
+    FE->>API: {"type":"start", "study_guide": {...}}
+    API->>API: VoiceSessionGuard.acquire(device_id)
+    API->>LIVE: client.aio.live.connect(model, config)
+    API-->>FE: {"type":"ready", "session_id": "vs_...", "max_duration_s": 180}
+
+    loop Push-to-Talk Turn
+        U->>FE: Hold talk button (pointerdown / Space)
+        FE->>API: {"type":"speech_start"}
+        FE->>API: Binary PCM16 frames (16 kHz mono)
+        API->>LIVE: send_realtime_input(audio=Blob)
+        U->>FE: Release talk button (pointerup)
+        FE->>API: {"type":"speech_end"}
+
+        LIVE-->>API: Server content (output transcription + 24 kHz PCM audio)
+        API-->>FE: {"type":"transcript", "role":"coach", "text":"..."}
+        API-->>FE: Binary PCM16 frames (24 kHz) -> AudioContext queue
+        LIVE-->>API: Tool call: record_answer(question, student_answer, correct, feedback)
+        API-->>FE: {"type":"answer_recorded", "score": {...}, ...}
+        API->>LIVE: send_tool_response(status="ok")
+        LIVE-->>API: Turn complete
+        API-->>FE: {"type":"turn_complete"}
+    end
+
+    LIVE-->>API: Tool call: end_quiz(summary="...")
+    API-->>FE: {"type":"quiz_summary", "summary":"...", "score":{...}}
+    API->>LIVE: send_tool_response(status="ok")
+    FE->>FE: saveQuizResult({..., mode: "voice"})
+    API-->>FE: {"type":"ended", "reason":"quiz_complete"}
+    API->>API: VoiceSessionGuard.release(device_id) & log voice_session_end
+```
+
 ## Tech Stack
 
 | Service | Technology | Version | Rationale |
@@ -107,7 +149,10 @@ sequenceDiagram
 | **Backend API** | FastAPI | 0.115+ | Async-first Python framework with built-in OpenAPI docs, Pydantic integration, and native multipart file upload support |
 | **Runtime** | Python | 3.12 | Stable release with full ecosystem support for google-cloud-aiplatform and firebase-admin SDKs |
 | **LLM Access** | Vertex AI SDK (`google-cloud-aiplatform`) | latest | Official Google SDK for Vertex AI with native support for multimodal content (images, PDFs) and structured output |
+| **Voice Live API** | Google GenAI SDK (`google-genai`) | 1.0+ | Official SDK for Gemini Live API bidirectional WebSocket streaming (`gemini-3.1-flash-live-preview`) |
+| **WebSocket Server** | `websockets` | 13.0+ | High-performance WebSocket support for Uvicorn and FastAPI |
 | **LLM Model** | Gemini 3.1 Pro | `gemini-3.1-pro-preview` | Native multimodal understanding (images, PDFs); 1M token context window enables processing multiple documents without chunking; stronger reasoning for messy handwriting, layout interpretation, and structured output |
+| **Voice Model** | Gemini 3.1 Flash Live | `gemini-3.1-flash-live-preview` | Sub-second audio latency, native speech generation and transcription, tool use for oral quiz scoring |
 | **File Storage** | Firebase Storage | N/A | CDN-backed object storage with simple upload/download APIs; integrates with Firebase Admin SDK for server-side access |
 | **Frontend** | React | 19.x | Component-based UI with hooks for state management; broad ecosystem for camera/file APIs |
 | **UI Framework** | MUI (Material UI) | 6.x | Pre-built accessible components (cards, buttons, dialogs, file inputs); responsive grid system for mobile-first design; built-in dark mode support |
@@ -167,12 +212,15 @@ backend/
   app/
     __init__.py
     main.py                         # FastAPI app factory, CORS config, router mounting
-    config.py                       # Settings via pydantic-settings (project ID, bucket, model)
+    config.py                       # Settings via pydantic-settings (project ID, bucket, model, voice caps)
+    rate_limit.py                   # slowapi per-IP limits & voice caps documentation
+    dependencies.py                 # Dependency injection (storage, gemini, live_client, device_id)
     routers/
       upload.py                     # POST /api/v1/materials/upload
       materials.py                  # GET /api/v1/materials, GET /api/v1/materials/{id}
       study_guides.py               # POST /api/v1/study-guides/generate, GET /api/v1/study-guides/{id}
       quizzes.py                    # POST/GET /api/v1/quizzes endpoints
+      voice.py                      # WS /api/v1/voice/session, GET /api/v1/voice/status
       health.py                     # GET /api/v1/health
     models/
       requests.py                   # Pydantic models for API request bodies
@@ -183,12 +231,21 @@ backend/
       study_guide_generator.py      # Orchestrates study guide prompt building + Gemini call
       quiz_generator.py             # Orchestrates quiz prompt building + Gemini call
       gemini_client.py              # Wraps Vertex AI SDK initialization and multimodal generate calls
+      live_client.py                # Wraps Google GenAI Live API client & session abstraction
+      voice_guard.py                # In-memory daily and concurrency spend caps
+      voice_session.py              # WebSocket relay, push-to-talk coordinator, tool execution
       storage_client.py             # Firebase Storage upload, download, URL generation
     prompts/
       study_guide_template.txt      # System instruction template for study guide generation
       quiz_template.txt             # System instruction template for quiz generation
+      voice_coach_template.txt      # System instruction template for oral quiz voice coach
+  scripts/
+    voice_smoke.py                  # Smoke test for WebSocket live relay
   tests/
-    __init__.py
+    test_voice.py                   # Full suite of unit & integration tests for voice mode
+    fixtures/
+      sample_study_guide.json       # Fixture for study guide JSON
+      hello_16k.pcm                 # Synthetic 16kHz PCM audio fixture
 ```
 
 ### Frontend (`/frontend`)
@@ -197,30 +254,41 @@ backend/
 frontend/
   index.html
   package.json
-  vite.config.js
+  vite.config.js                    # Vite configuration with WebSocket proxy and Vitest
   public/
+    worklets/
+      pcm-recorder.worklet.js       # AudioWorklet processor for raw mic capture
   src/
     main.jsx                        # React entry point
     App.jsx                         # Root component with MUI ThemeProvider and routing
     theme.js                        # MUI theme configuration (light/dark mode)
     api/
-      client.js                     # Fetch wrapper for backend API calls
+      client.js                     # Fetch wrapper for backend API calls (incl. getVoiceStatus)
     components/
       MaterialUpload.jsx            # Drag-and-drop + file picker upload component
       MaterialList.jsx              # Grid/list of uploaded materials with thumbnails
       StudyGuideView.jsx            # Rendered study guide with sections and highlights
       QuizView.jsx                  # Interactive quiz with question cards and answer inputs
       CameraCapture.jsx             # Camera integration for snapping photos of notes
+      VoiceControls.jsx             # Hold-to-talk button, countdown timer, end session
+      VoiceTranscript.jsx           # Real-time dialogue transcript
+      VoiceScorePanel.jsx           # Running oral quiz score chip and per-question feedback
       TopNav.jsx                    # App bar with navigation and dark mode toggle
     pages/
-      HomePage.jsx                  # Landing page with upload CTA and recent materials
+      HomePage.jsx                  # Landing page with upload CTA and 4 step cards
       MaterialsPage.jsx             # Material management and selection view
-      StudyGuidePage.jsx            # Study guide generation and display
-      QuizPage.jsx                  # Quiz generation, taking, and results
+      StudyGuidePage.jsx            # Study guide generation and "Quiz me by voice" CTA
+      QuizPage.jsx                  # Quiz generation, taking, results, and voice history chip
+      VoicePage.jsx                 # Voice Coach session interface
     hooks/
       useUpload.js                  # Custom hook for file upload with progress tracking
       useStudyGuide.js              # Custom hook for study guide generation with loading state
       useQuiz.js                    # Custom hook for quiz generation and submission
+      useVoiceSession.js            # Custom hook managing WebSocket, mic stream, and 24kHz audio queue
+    utils/
+      pcm.js                        # Downsampling to 16kHz and Int16 PCM conversion
+      voiceProtocol.js              # State reducer and error code mappings for voice sessions
+      quizHistory.js                # Quiz history storage supporting written and voice modes
     styles/
       global.css                    # Global styles, CSS variables, font imports
 ```

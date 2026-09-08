@@ -42,11 +42,49 @@ class Settings(BaseSettings):
     # Set DOCS_ENABLED=true in local dev if you want /docs back.
     docs_enabled: bool = False
 
+    # Voice Coach settings
+    voice_enabled: bool = False
+    gemini_live_api_key: str = ""
+    gemini_live_model: str = "gemini-3.1-flash-live-preview"
+    voice_coach_voice: str = "Kore"
+    voice_allowed_voices: list[str] = [
+        "Kore",
+        "Puck",
+        "Charon",
+        "Aoede",
+        "Fenrir",
+        "Leda",
+        "Orus",
+        "Zephyr",
+    ]
+    voice_session_max_seconds: int = 180
+    voice_sessions_per_device_per_day: int = 2
+    voice_sessions_per_day_global: int = 20
+    voice_max_concurrent_sessions: int = 2
+    voice_idle_timeout_seconds: int = 45
+    voice_start_timeout_seconds: float = 5.0
+    voice_max_guide_bytes: int = 32768
+    voice_audio_in_price_per_m: float = 3.0
+    voice_audio_out_price_per_m: float = 12.0
+    voice_quiz_questions: int = 5
+
+    @property
+    def voice_audio_quota_bytes(self) -> int:
+        """Derived inbound audio byte quota per session."""
+        return 16000 * 2 * self.voice_session_max_seconds
+
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def parse_allowed_origins(cls, v: object) -> list[str]:
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v  # type: ignore[return-value]
+
+    @field_validator("voice_allowed_voices", mode="before")
+    @classmethod
+    def parse_voice_allowed_voices(cls, v: object) -> list[str]:
+        if isinstance(v, str):
+            return [voice.strip() for voice in v.split(",") if voice.strip()]
         return v  # type: ignore[return-value]
 
     @model_validator(mode="after")
@@ -57,6 +95,8 @@ class Settings(BaseSettings):
             missing.append("GCP_PROJECT_ID")
         if not self.firebase_storage_bucket:
             missing.append("FIREBASE_STORAGE_BUCKET")
+        if self.voice_enabled and not self.gemini_live_api_key:
+            missing.append("GEMINI_LIVE_API_KEY")
         if missing:
             raise ValueError(
                 f"Missing required environment variable(s): {', '.join(missing)}. "

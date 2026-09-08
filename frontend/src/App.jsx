@@ -8,6 +8,7 @@ import HomePage from "./pages/HomePage";
 import MaterialsPage from "./pages/MaterialsPage";
 import StudyGuidePage from "./pages/StudyGuidePage";
 import QuizPage from "./pages/QuizPage";
+import VoicePage from "./pages/VoicePage";
 
 function App() {
   const [mode, setMode] = useState(
@@ -35,6 +36,7 @@ function App() {
             <Route path="/materials" element={<MaterialsPage />} />
             <Route path="/study-guide" element={<StudyGuidePage />} />
             <Route path="/quiz" element={<QuizPage />} />
+            <Route path="/voice" element={<VoicePage />} />
           </Routes>
         </Box>
         <Footer />

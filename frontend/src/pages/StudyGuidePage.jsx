@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import {
   Container,
   Typography,
@@ -35,6 +36,7 @@ import useMaterials from "../hooks/useMaterials";
 
 function StudyGuidePage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const passedIds = location.state?.selectedIds || [];
 
   const { materials, loading: materialsLoading } = useMaterials();
@@ -133,6 +135,14 @@ function StudyGuidePage() {
               Save
             </Button>
           )}
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<RecordVoiceOverIcon />}
+            onClick={() => navigate("/voice", { state: { studyGuide } })}
+          >
+            Quiz me by voice
+          </Button>
         </Stack>
         <StudyGuideView studyGuide={studyGuide} />
 

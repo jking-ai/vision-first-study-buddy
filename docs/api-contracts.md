@@ -725,3 +725,77 @@ class ErrorResponse(BaseModel):
 5. **Quiz grading:** Multiple choice questions are graded with exact match. Short answer questions should be graded by sending the student's answer and the correct answer to Gemini for semantic comparison, returning a boolean and explanation.
 
 6. **In-memory storage:** For the MVP, generated study guides and quizzes can be stored in an in-memory dict keyed by ID. This means they are lost on server restart, which is acceptable for a portfolio project.
+
+---
+
+## Voice Coach Endpoints
+
+### GET /api/v1/voice/status
+
+Check voice mode availability, caps, and remaining sessions for the current device.
+
+**Request Headers:**
+- `X-Device-ID: string (1..64 chars)` (required)
+
+**Response (200 OK):**
+```json
+{
+  "enabled": true,
+  "max_duration_s": 180,
+  "sessions_per_device_per_day": 2,
+  "remaining_today": 2,
+  "model": "gemini-3.1-flash-live-preview"
+}
+```
+
+---
+
+### WS /api/v1/voice/session
+
+Bidirectional WebSocket connection for live interactive voice coaching and oral quizzes powered by Gemini Live API.
+
+**Handshake:**
+- No query parameters or subprotocols required.
+- `Origin` header validated against `ALLOWED_ORIGINS` when non-empty.
+
+**Client → Server Messages:**
+
+| Frame | Shape | Description |
+|---|---|---|
+| text | `{"type":"start","device_id":"<id>","study_guide":<StudyGuide>,"voice":"<optional>","num_questions":<optional 3..10>}` | First frame within 5s of accept. |
+| text | `{"type":"speech_start"}` | Student pressed talk (ActivityStart). |
+| binary | raw PCM16 LE, 16 kHz, mono (≤32768 bytes/frame) | Audio data forwarded to Live session. |
+| text | `{"type":"speech_end"}` | Student released talk (ActivityEnd). |
+| text | `{"type":"end"}` | Request normal session termination. |
+
+**Server → Client Messages:**
+
+| Frame | Shape | Description |
+|---|---|---|
+| text | `{"type":"ready","session_id":"vs_<8 hex>","max_duration_s":180,"ends_at":"<ISO UTC>","voice":"<name>"}` | Initial ready frame once session connected. |
+| binary | raw PCM16 LE, 24 kHz, mono | Spoken audio chunks from coach. |
+| text | `{"type":"transcript","role":"user"\|"coach","text":"<string>"}` | Real-time transcription chunks. |
+| text | `{"type":"turn_complete"}` | Coach finished speaking a turn. |
+| text | `{"type":"interrupted"}` | Coach turn interrupted by user. |
+| text | `{"type":"answer_recorded","index":<1-based>,"question":"<string>","student_answer":"<string>","correct":<bool>,"feedback":"<string>","score":{"correct":<int>,"total":<int>}}` | Answer recorded during oral quiz. |
+| text | `{"type":"quiz_summary","summary":"<string>","score":{"correct":<int>,"asked":<int>,"total":<int>}}` | Final summary and score after last question. |
+| text | `{"type":"ended","reason":"client_end"\|"max_duration"\|"idle_timeout"\|"upstream_closed"\|"quiz_complete"}` | Normal end frame before close 1000. |
+| text | `{"type":"error","code":"<CODE>","message":"<string>"}` | Error frame sent before close. |
+
+**WebSocket Close Codes:**
+
+| Code | Error Code | Description |
+|---|---|---|
+| 1000 | none | Normal termination after `ended`. |
+| 1011 | `UPSTREAM_ERROR` | Live API upstream error. |
+| 4400 | `BAD_MESSAGE`, `FRAME_TOO_LARGE`, `INVALID_STUDY_GUIDE`, `GUIDE_TOO_LARGE`, `INVALID_VOICE`, `INVALID_NUM_QUESTIONS` | Malformed or oversize client input. |
+| 4401 | `INVALID_DEVICE_ID` | `device_id` missing, empty, or >64 characters. |
+| 4403 | `ORIGIN_NOT_ALLOWED` | Origin check failed. |
+| 4408 | `START_TIMEOUT` | No `start` frame within timeout. |
+| 4429 | `DEVICE_DAILY_LIMIT`, `GLOBAL_DAILY_LIMIT`, `CONCURRENT_LIMIT`, `AUDIO_QUOTA_EXCEEDED` | Session or rate cap hit. |
+| 4503 | `VOICE_DISABLED` | Feature flag `VOICE_ENABLED` is false. |
+
+**Live API Tool Declarations:**
+- `record_answer`: parameters `question` (str), `student_answer` (str), `correct` (bool), `feedback` (str).
+- `end_quiz`: parameters `summary` (str).
+

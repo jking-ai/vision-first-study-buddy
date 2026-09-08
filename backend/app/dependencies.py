@@ -6,10 +6,16 @@ from fastapi import Depends, Header, HTTPException
 
 from app.config import Settings, get_settings
 from app.services.gemini_client import GeminiClient
+from app.services.live_client import GenAILiveClient, LiveClient
 from app.services.material_processor import MaterialProcessor
 from app.services.quiz_generator import QuizGenerator
 from app.services.storage_client import StorageClient
 from app.services.study_guide_generator import StudyGuideGenerator
+
+
+def get_live_client(settings: Settings = Depends(get_settings)) -> LiveClient:
+    """Return a LiveClient configured with the current API key."""
+    return GenAILiveClient(settings.gemini_live_api_key)
 
 
 def get_storage_client(settings: Settings = Depends(get_settings)) -> StorageClient:

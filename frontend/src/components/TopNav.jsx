@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Materials", path: "/materials" },
   { label: "Study Guide", path: "/study-guide" },
   { label: "Quiz", path: "/quiz" },
+  { label: "Voice Coach", path: "/voice" },
 ];
 
 function TopNav({ mode, toggleColorMode }) {

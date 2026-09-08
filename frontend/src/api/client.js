@@ -97,6 +97,9 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify({ answers }),
     }),
+
+  /** Get voice status and session caps */
+  getVoiceStatus: () => request("/voice/status"),
 };
 
 export default apiClient;

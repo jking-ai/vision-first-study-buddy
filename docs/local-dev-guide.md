@@ -75,17 +75,16 @@ npm run dev
 
 <!-- TODO: Add end-to-end verification steps -->
 
-1. Backend health check returns 200
+1. Backend health check returns 200 (`curl http://localhost:8000/api/v1/health`)
 2. Frontend loads in browser at `http://localhost:5173`
 3. Upload an image file through the frontend
 4. Generate a study guide from the uploaded material
 5. Generate a quiz and submit answers
+6. Click "Quiz me by voice" on a generated study guide to start an interactive Voice Coach session (`/voice`).
 
 ---
 
 ## Troubleshooting
-
-<!-- TODO: Add common issues and solutions -->
 
 | Issue | Solution |
 |-------|----------|
@@ -95,3 +94,5 @@ npm run dev
 | Firebase Storage permission denied | Verify service account has Storage Object Admin role |
 | Port already in use | Kill the existing process or use a different port |
 | Camera not working in browser | Ensure the page is served over HTTPS or localhost (required for MediaDevices API) |
+| Voice WebSocket not connecting | Ensure `VOICE_ENABLED=true` and `GEMINI_LIVE_API_KEY` is set in `backend/.env`. Check that `frontend/vite.config.js` proxy has `ws: true`. |
+| Voice mic permission denied | Allow microphone permissions in browser site settings. |

@@ -13,6 +13,7 @@ import Grid from "@mui/material/Grid2";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import AutoStoriesIcon from "@mui/icons-material/AutoStories";
 import QuizIcon from "@mui/icons-material/Quiz";
+import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 
 const steps = [
   {
@@ -33,6 +34,12 @@ const steps = [
     description:
       "Test your knowledge with auto-generated quizzes. Get instant feedback and explanations.",
   },
+  {
+    icon: <RecordVoiceOverIcon sx={{ fontSize: 48 }} color="primary" />,
+    title: "Quiz by Voice",
+    description:
+      "Practice out loud with an interactive voice coach. Get real-time spoken feedback and oral quiz scoring.",
+  },
 ];
 
 function HomePage() {
@@ -45,9 +52,8 @@ function HomePage() {
         <Typography variant="h1" gutterBottom>
           Vision-First Study Buddy
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 600, mx: "auto" }}>
-          Upload your notes, whiteboard photos, PDFs, and epubs — then generate
-          personalized study guides and quizzes powered by Gemini 3.1 Pro.
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Turn handwritten notes, whiteboard photos, PDFs, and ebooks into personalized study guides and interactive quizzes.
         </Typography>
         <Button
           variant="contained"
@@ -65,7 +71,7 @@ function HomePage() {
       </Typography>
       <Grid container spacing={3}>
         {steps.map((step, i) => (
-          <Grid key={i} size={{ xs: 12, sm: 4 }}>
+          <Grid key={i} size={{ xs: 12, sm: 6 }}>
             <Card sx={{ textAlign: "center", height: "100%", p: 2 }}>
               <CardContent>
                 {step.icon}

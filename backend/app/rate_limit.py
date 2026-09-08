@@ -57,6 +57,15 @@ QUIZ_GENERATE_LIMITS = "5/minute;30/day"
 QUIZ_SUBMIT_LIMITS = "20/minute;200/day"
 MATERIAL_UPLOAD_LIMITS = "10/minute;100/day"
 
+# Voice Mode session caps (enforced per-device/global/concurrency via VoiceSessionGuard;
+# see Settings in app/config.py):
+# - VOICE_SESSION_MAX_SECONDS: 180 (3 minutes per session)
+# - VOICE_SESSIONS_PER_DEVICE_PER_DAY: 2 (per device per UTC day)
+# - VOICE_SESSIONS_PER_DAY_GLOBAL: 20 (global per UTC day)
+# - VOICE_MAX_CONCURRENT_SESSIONS: 2
+# - VOICE_IDLE_TIMEOUT_SECONDS: 45
+# - Inbound audio byte quota: 16000 * 2 * VOICE_SESSION_MAX_SECONDS bytes
+
 
 # headers_enabled is False on the Limiter itself: when both `SlowAPIMiddleware`
 # and `@limiter.limit` decorators are in play, the middleware is the one that

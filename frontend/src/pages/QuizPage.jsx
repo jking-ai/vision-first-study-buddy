@@ -243,6 +243,14 @@ function QuizPage() {
                         </Typography>
                       </Box>
                       <Stack direction="row" alignItems="center" spacing={1}>
+                        {entry.mode === "voice" && (
+                          <Chip
+                            label="Voice"
+                            size="small"
+                            color="secondary"
+                            variant="outlined"
+                          />
+                        )}
                         <Chip
                           label={`${entry.score}/${entry.total}`}
                           size="small"
