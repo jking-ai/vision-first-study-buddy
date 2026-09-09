@@ -34,6 +34,29 @@ NEXT_QUESTION_PROMPT = (
 )
 
 
+def _coerce_bool(value: Any) -> bool | None:
+    """Accept the ways a model tends to spell a boolean."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ("true", "yes", "correct", "right", "1"):
+            return True
+        if v in ("false", "no", "incorrect", "wrong", "0"):
+            return False
+    return None
+
+
+def _coerce_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip() or None
+    return str(value)
+
+
 def _render_prompt(guide: StudyGuide, num_questions: int) -> str:
     template = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
     sections_lines = []
@@ -93,6 +116,8 @@ class VoiceSessionCoordinator:
         self.model_speaking = False  # audio received since the last turn_complete
         self.awaiting_response = False  # student finished speaking, coach hasn't completed a turn
         self.answer_recorded_this_turn = False
+        self.spoken_since_record = ""  # tutor transcript after the last record_answer in this turn
+        self.end_quiz_rejections = 0
 
     async def _send_error_and_close(self, code: int, error_code: str, message: str) -> None:
         try:
@@ -424,6 +449,8 @@ class VoiceSessionCoordinator:
                                     getattr(sc, "output_transcription", None)
                                     and sc.output_transcription.text
                                 ):
+                                    if self.answer_recorded_this_turn:
+                                        self.spoken_since_record += sc.output_transcription.text
                                     await self.websocket.send_text(
                                         json.dumps(
                                             {
@@ -458,8 +485,16 @@ class VoiceSessionCoordinator:
                                         break
                                     if self.answer_recorded_this_turn:
                                         self.answer_recorded_this_turn = False
+                                        already_asked = "?" in self.spoken_since_record
+                                        self.spoken_since_record = ""
                                         cancel_nudge()
-                                        nudge_task = asyncio.create_task(nudge_next_question())
+                                        if already_asked:
+                                            logger.info(
+                                                "voice tool: skip nudge, tutor already asked the next question session=%s",
+                                                self.session_id,
+                                            )
+                                        else:
+                                            nudge_task = asyncio.create_task(nudge_next_question())
 
                                 if getattr(sc, "interrupted", False):
                                     await self.websocket.send_text(json.dumps({"type": "interrupted"}))
@@ -473,13 +508,20 @@ class VoiceSessionCoordinator:
                                     fc_args = getattr(fc, "args", {}) or {}
 
                                     if fc_name == "record_answer":
-                                        # Validate args
-                                        q = fc_args.get("question")
-                                        sa = fc_args.get("student_answer")
-                                        c = fc_args.get("correct")
-                                        fb = fc_args.get("feedback")
+                                        # Validate args, leniently: a dropped answer costs the
+                                        # student a result, a coerced one costs nothing.
+                                        q = _coerce_str(fc_args.get("question"))
+                                        sa = _coerce_str(fc_args.get("student_answer")) or "(no answer captured)"
+                                        c = _coerce_bool(fc_args.get("correct"))
+                                        fb = _coerce_str(fc_args.get("feedback")) or ""
 
-                                        if not all([isinstance(q, str), isinstance(sa, str), isinstance(c, bool), isinstance(fb, str)]):
+                                        if q is None or c is None:
+                                            logger.warning(
+                                                "voice tool: record_answer invalid args session=%s keys=%s correct=%r",
+                                                self.session_id,
+                                                sorted(fc_args.keys()),
+                                                fc_args.get("correct"),
+                                            )
                                             responses.append(
                                                 types.FunctionResponse(
                                                     id=fc_id,
@@ -488,6 +530,10 @@ class VoiceSessionCoordinator:
                                                 )
                                             )
                                         elif len(self.recorded_answers) >= self.num_questions:
+                                            logger.info(
+                                                "voice tool: record_answer ignored, quiz full session=%s",
+                                                self.session_id,
+                                            )
                                             responses.append(
                                                 types.FunctionResponse(
                                                     id=fc_id,
@@ -509,6 +555,13 @@ class VoiceSessionCoordinator:
                                             }
                                             self.recorded_answers.append(rec)
                                             self.answer_recorded_this_turn = True
+                                            self.spoken_since_record = ""
+                                            logger.info(
+                                                "voice tool: record_answer ok session=%s index=%d correct=%s",
+                                                self.session_id,
+                                                idx,
+                                                c,
+                                            )
                                             # Client frame
                                             await self.websocket.send_text(
                                                 json.dumps(
@@ -539,8 +592,14 @@ class VoiceSessionCoordinator:
                                             )
 
                                     elif fc_name == "end_quiz":
-                                        summary = fc_args.get("summary")
-                                        if not summary or not isinstance(summary, str):
+                                        summary = _coerce_str(fc_args.get("summary"))
+                                        recorded = len(self.recorded_answers)
+                                        if summary is None:
+                                            logger.warning(
+                                                "voice tool: end_quiz invalid args session=%s keys=%s",
+                                                self.session_id,
+                                                sorted(fc_args.keys()),
+                                            )
                                             responses.append(
                                                 types.FunctionResponse(
                                                     id=fc_id,
@@ -548,7 +607,41 @@ class VoiceSessionCoordinator:
                                                     response={"status": "error", "reason": "invalid_arguments"},
                                                 )
                                             )
+                                        elif recorded < self.num_questions and self.end_quiz_rejections == 0:
+                                            # Send the tutor back for the answers it never recorded.
+                                            # Accepted on the second attempt so a session cannot wedge.
+                                            self.end_quiz_rejections += 1
+                                            logger.warning(
+                                                "voice tool: end_quiz rejected, answers missing session=%s recorded=%d expected=%d",
+                                                self.session_id,
+                                                recorded,
+                                                self.num_questions,
+                                            )
+                                            responses.append(
+                                                types.FunctionResponse(
+                                                    id=fc_id,
+                                                    name=fc_name,
+                                                    response={
+                                                        "status": "error",
+                                                        "reason": "answers_missing",
+                                                        "recorded": recorded,
+                                                        "expected": self.num_questions,
+                                                        "message": (
+                                                            f"Only {recorded} of {self.num_questions} answers are recorded. "
+                                                            "Call record_answer for every answer the student gave that you "
+                                                            "have not recorded yet, ask any questions you have not asked, "
+                                                            "then call end_quiz again."
+                                                        ),
+                                                    },
+                                                )
+                                            )
                                         else:
+                                            logger.info(
+                                                "voice tool: end_quiz ok session=%s recorded=%d expected=%d",
+                                                self.session_id,
+                                                recorded,
+                                                self.num_questions,
+                                            )
                                             self.end_quiz_received = True
                                             quiz_complete_deadline = time.monotonic() + 15.0
                                             await self.websocket.send_text(

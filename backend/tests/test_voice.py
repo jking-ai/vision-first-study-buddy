@@ -898,7 +898,8 @@ def test_end_quiz_summary_then_quiz_complete(
         server_content=types.LiveServerContent(turn_complete=True)
     )
 
-    fake_live = FakeLiveClient([end_msg, turn_complete_msg])
+    # First end_quiz is rejected (no answers recorded); the retry is accepted.
+    fake_live = FakeLiveClient([end_msg, end_msg, turn_complete_msg])
     app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
     app.dependency_overrides[get_live_client] = lambda: fake_live
     client = TestClient(app)
@@ -941,7 +942,7 @@ def test_end_quiz_fallback_timeout(
         )
     )
 
-    fake_live = FakeLiveClient([end_msg])
+    fake_live = FakeLiveClient([end_msg, end_msg])
     app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
     app.dependency_overrides[get_live_client] = lambda: fake_live
     client = TestClient(app)
@@ -1035,3 +1036,122 @@ def test_session_end_log_line_has_quiz_counts(
     log_data = json.loads(lines[0])
     assert log_data["questions_asked"] == 1
     assert log_data["questions_correct"] == 1
+
+
+def _record_call(call_id: str, question: str, correct: Any) -> types.LiveServerMessage:
+    return types.LiveServerMessage(
+        tool_call=types.LiveServerToolCall(
+            function_calls=[
+                types.FunctionCall(
+                    id=call_id,
+                    name="record_answer",
+                    args={
+                        "question": question,
+                        "student_answer": "An answer",
+                        "correct": correct,
+                        "feedback": "Feedback.",
+                    },
+                )
+            ]
+        )
+    )
+
+
+def test_record_answer_coerces_string_bool(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    """A model that spells the boolean as a string still gets its answer recorded."""
+    fake_live = FakeLiveClient([_record_call("c1", "Q1?", "true"), _record_call("c2", "Q2?", "False")])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-coerce", "study_guide": sample_study_guide, "num_questions": 5})
+        assert ws.receive_json()["type"] == "ready"
+        first = ws.receive_json()
+        assert first["type"] == "answer_recorded" and first["correct"] is True
+        second = ws.receive_json()
+        assert second["type"] == "answer_recorded" and second["correct"] is False
+        assert second["score"] == {"correct": 1, "total": 5}
+        ws.send_json({"type": "end"})
+        ws.receive_json()
+
+
+def test_end_quiz_rejected_once_when_answers_missing(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    end_msg = types.LiveServerMessage(
+        tool_call=types.LiveServerToolCall(
+            function_calls=[types.FunctionCall(id="e1", name="end_quiz", args={"summary": "Done."})]
+        )
+    )
+    fake_live = FakeLiveClient([_record_call("c1", "Q1?", True), end_msg])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-missing", "study_guide": sample_study_guide, "num_questions": 5})
+        assert ws.receive_json()["type"] == "ready"
+        assert ws.receive_json()["type"] == "answer_recorded"
+
+        import time as _time
+
+        session = fake_live.current_session
+        assert session is not None
+        deadline = _time.monotonic() + 2.0
+        while _time.monotonic() < deadline and len(session.sent_tool_responses) < 2:
+            _time.sleep(0.02)
+        rejection = session.sent_tool_responses[1][0]
+        assert rejection.response["status"] == "error"
+        assert rejection.response["reason"] == "answers_missing"
+        assert rejection.response["recorded"] == 1
+        assert rejection.response["expected"] == 5
+
+        # The tutor records the rest and retries; the retry is accepted.
+        for i in range(2, 6):
+            session.incoming_queue.put_nowait(_record_call(f"c{i}", f"Q{i}?", True))
+        for _ in range(4):
+            assert ws.receive_json()["type"] == "answer_recorded"
+        session.incoming_queue.put_nowait(end_msg)
+        summary = ws.receive_json()
+        assert summary["type"] == "quiz_summary"
+        assert summary["score"] == {"correct": 5, "asked": 5, "total": 5}
+        ws.send_json({"type": "end"})
+        ws.receive_json()
+
+
+def test_nudge_skipped_when_tutor_already_asked_next_question(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    voice_enabled_settings.voice_next_question_pause_seconds = 0.05
+    asked_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(
+            output_transcription=types.Transcription(text=" Question 2: what is the Calvin cycle?")
+        )
+    )
+    turn_complete_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(turn_complete=True)
+    )
+    fake_live = FakeLiveClient([_record_call("c1", "Q1?", True), asked_msg, turn_complete_msg])
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-asked", "study_guide": sample_study_guide})
+        assert ws.receive_json()["type"] == "ready"
+        assert ws.receive_json()["type"] == "answer_recorded"
+        assert ws.receive_json()["type"] == "transcript"
+        assert ws.receive_json()["type"] == "turn_complete"
+
+        import time as _time
+
+        _time.sleep(0.4)
+        session = fake_live.current_session
+        assert session is not None
+        assert len(session.sent_inputs) == 1  # kickoff only; no nudge
+
+        ws.send_json({"type": "end"})
+        ws.receive_json()
