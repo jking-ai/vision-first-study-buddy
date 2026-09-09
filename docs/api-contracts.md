@@ -799,6 +799,8 @@ Bidirectional WebSocket connection for Talking Tutor sessions: live oral quizzes
 **Pacing:** after the coach records an answer and finishes its feedback turn, the server waits `VOICE_NEXT_QUESTION_PAUSE_SECONDS` (default 2.5) and then prompts the coach to ask the next question. A `speech_start` during the pause cancels the prompt.
 
 **Live API Tool Declarations:**
-- `record_answer`: parameters `question` (str), `student_answer` (str), `correct` (bool), `feedback` (str).
-- `end_quiz`: parameters `summary` (str).
+- `record_answer`: parameters `question` (str), `student_answer` (str), `correct` (bool), `feedback` (str). Arguments are coerced leniently (`correct` accepts `"true"`/`"false"` strings, missing `feedback` becomes empty) so a sloppy call still records the answer. Rejected only when `question` or `correct` is unusable.
+- `end_quiz`: parameters `summary` (str). If fewer than `num_questions` answers have been recorded, the first call is rejected with `{"status":"error","reason":"answers_missing","recorded":n,"expected":N,"message":...}` so the tutor records the missing answers; a second call is always accepted.
+
+The relay also skips the next-question prompt when the tutor's transcript after `record_answer` already contains a question, to avoid repeating one.
 
