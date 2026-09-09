@@ -797,6 +797,8 @@ Bidirectional WebSocket connection for Talking Tutor sessions: live oral quizzes
 | 4429 | `DEVICE_DAILY_LIMIT`, `GLOBAL_DAILY_LIMIT`, `CONCURRENT_LIMIT`, `AUDIO_QUOTA_EXCEEDED` | Session or rate cap hit. |
 | 4503 | `VOICE_DISABLED` | Feature flag `VOICE_ENABLED` is false. |
 
+**Recording verification:** the relay marks an answer as pending on `speech_end`. If the tutor's turn completes with no `record_answer` call, the relay sends it one text reminder to record the answer and continue. The tool reply carries `recorded` and `remaining` counts, and the prompt tells the tutor to check them before moving on.
+
 **Pacing:** the tutor gives feedback and asks the next question in one turn. After each recorded answer the relay sends a `pause` frame with `VOICE_NEXT_QUESTION_PAUSE_SECONDS` (default 2.5); the client shifts its playback clock by that much, so the gap is deterministic and does not depend on the model ending its turn.
 
 **Live API Tool Declarations:**

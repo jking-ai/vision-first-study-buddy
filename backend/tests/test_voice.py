@@ -1056,3 +1056,78 @@ def test_pause_frame_follows_each_recorded_answer(
         assert len(session.sent_inputs) == 1
         ws.send_json({"type": "end"})
         rj(ws)
+
+
+def test_reminder_sent_when_answer_not_recorded(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    """Student answers, tutor's turn completes with no record_answer: relay reminds it."""
+    turn_complete_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(turn_complete=True)
+    )
+    fake_live = FakeLiveClient()
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-remind", "study_guide": sample_study_guide})
+        assert rj(ws)["type"] == "ready"
+        ws.send_json({"type": "speech_start"})
+        ws.send_json({"type": "speech_end"})
+
+        import time as _time
+
+        session = fake_live.current_session
+        assert session is not None
+        deadline = _time.monotonic() + 2.0
+        while _time.monotonic() < deadline and not any(i["activity_end"] for i in session.sent_realtime_inputs):
+            _time.sleep(0.02)
+
+        session.incoming_queue.put_nowait(turn_complete_msg)
+        assert rj(ws)["type"] == "turn_complete"
+
+        deadline = _time.monotonic() + 2.0
+        while _time.monotonic() < deadline and len(session.sent_inputs) < 2:
+            _time.sleep(0.02)
+        assert len(session.sent_inputs) == 2
+        assert "did not record" in session.sent_inputs[1]["input"]
+
+        ws.send_json({"type": "end"})
+        rj(ws)
+
+
+def test_no_reminder_when_answer_was_recorded(
+    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
+):
+    turn_complete_msg = types.LiveServerMessage(
+        server_content=types.LiveServerContent(turn_complete=True)
+    )
+    fake_live = FakeLiveClient()
+    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
+    app.dependency_overrides[get_live_client] = lambda: fake_live
+    client = TestClient(app)
+
+    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
+        ws.send_json({"type": "start", "device_id": "dev-noremind", "study_guide": sample_study_guide})
+        assert rj(ws)["type"] == "ready"
+        ws.send_json({"type": "speech_start"})
+        ws.send_json({"type": "speech_end"})
+
+        import time as _time
+
+        session = fake_live.current_session
+        assert session is not None
+        deadline = _time.monotonic() + 2.0
+        while _time.monotonic() < deadline and not any(i["activity_end"] for i in session.sent_realtime_inputs):
+            _time.sleep(0.02)
+
+        session.incoming_queue.put_nowait(_record_call("c1", "Q1?", True))
+        session.incoming_queue.put_nowait(turn_complete_msg)
+        assert rj(ws)["type"] == "answer_recorded"
+        assert rj(ws)["type"] == "turn_complete"
+        _time.sleep(0.3)
+        assert len(session.sent_inputs) == 1  # kickoff only
+
+        ws.send_json({"type": "end"})
+        rj(ws)
