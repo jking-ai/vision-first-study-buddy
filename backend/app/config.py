@@ -67,7 +67,8 @@ class Settings(BaseSettings):
     voice_audio_in_price_per_m: float = 3.0
     voice_audio_out_price_per_m: float = 12.0
     voice_quiz_questions: int = 5
-    # Silence between the coach's feedback on an answer and the next question.
+    # Silence the client inserts in playback between the tutor's feedback on an
+    # answer and the next question (sent as a "pause" frame after each record).
     voice_next_question_pause_seconds: float = 2.5
     # After the time limit, input is locked; the coach may finish its current
     # turn for up to this many seconds before the session ends.

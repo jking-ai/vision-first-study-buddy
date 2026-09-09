@@ -60,7 +60,7 @@ The backend is deployed to Cloud Run with `allUsers` invoker — i.e., the publi
   - Concurrency limit: 2 active sessions simultaneously
   - Inbound audio quota: 16,000 * 2 * 180 bytes per session
   - Idle timeout: 45 seconds without client activity
-  - Pacing: after the tutor's feedback on an answer, the server waits 2.5 seconds (`VOICE_NEXT_QUESTION_PAUSE_SECONDS`) before prompting it to ask the next question
+  - Pacing: after each recorded answer the relay sends a `pause` frame (`VOICE_NEXT_QUESTION_PAUSE_SECONDS`, 2.5 s) and the client inserts that much silence in playback before the next question
 - **Docs disabled in production**: `DOCS_ENABLED=false` (default) sets `docs_url`, `redoc_url`, and `openapi_url` to `None`, so the API surface map is not advertised on the public URL.
 - **CORS**: `allowed_origins` defaults to an empty list in code. Production must set `ALLOWED_ORIGINS` explicitly to the prod web app origins.
 - **Budget alert**: a GCP budget alert is configured separately to notify on Vertex AI / Cloud Run spend.

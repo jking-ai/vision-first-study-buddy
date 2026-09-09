@@ -92,6 +92,14 @@ class FakeLiveClient(LiveClient):
             pass
 
 
+def rj(ws) -> dict[str, Any]:
+    """Receive the next JSON frame, skipping pacing "pause" frames."""
+    while True:
+        frame = ws.receive_json()
+        if frame.get("type") != "pause":
+            return frame
+
+
 @pytest.fixture
 def sample_study_guide() -> dict[str, Any]:
     with open("tests/fixtures/sample_study_guide.json", "r", encoding="utf-8") as f:
@@ -140,7 +148,7 @@ def test_voice_disabled_closes_4503(voice_disabled_settings: Settings):
         with client.websocket_connect(
             "/api/v1/voice/session", headers={"origin": "http://localhost:5173"}
         ) as ws:
-            err_frame = ws.receive_json()
+            err_frame = rj(ws)
             assert err_frame["type"] == "error"
             assert err_frame["code"] == "VOICE_DISABLED"
             ws.receive_text()
@@ -154,7 +162,7 @@ def test_origin_not_allowed_closes_4403(voice_enabled_settings: Settings):
         with client.websocket_connect(
             "/api/v1/voice/session", headers={"origin": "https://evil.example"}
         ) as ws:
-            err_frame = ws.receive_json()
+            err_frame = rj(ws)
             assert err_frame["type"] == "error"
             assert err_frame["code"] == "ORIGIN_NOT_ALLOWED"
             ws.receive_text()
@@ -177,7 +185,7 @@ def test_start_then_ready(voice_enabled_settings: Settings, sample_study_guide: 
                 "study_guide": sample_study_guide,
             }
         )
-        ready_frame = ws.receive_json()
+        ready_frame = rj(ws)
         assert ready_frame["type"] == "ready"
         assert re.match(r"^vs_[0-9a-f]{8}$", ready_frame["session_id"])
         assert ready_frame["max_duration_s"] == 180
@@ -186,7 +194,7 @@ def test_start_then_ready(voice_enabled_settings: Settings, sample_study_guide: 
 
         # Clean exit
         ws.send_json({"type": "end"})
-        ended_frame = ws.receive_json()
+        ended_frame = rj(ws)
         assert ended_frame["type"] == "ended"
         assert ended_frame["reason"] == "client_end"
 
@@ -233,7 +241,7 @@ def test_audio_relayed_both_directions(
                 "study_guide": sample_study_guide,
             }
         )
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # Client starts speech and sends 480 bytes of 16kHz audio
         ws.send_json({"type": "speech_start"})
@@ -241,16 +249,16 @@ def test_audio_relayed_both_directions(
         ws.send_json({"type": "speech_end"})
 
         # Expect server transcripts and audio
-        t1 = ws.receive_json()
+        t1 = rj(ws)
         assert t1 == {"type": "transcript", "role": "user", "text": "I am ready"}
-        t2 = ws.receive_json()
+        t2 = rj(ws)
         assert t2 == {"type": "transcript", "role": "coach", "text": "Hello student"}
 
         audio_part = ws.receive_bytes()
         assert len(audio_part) == 480
         assert audio_part == b"\x00\x01" * 240
 
-        turn = ws.receive_json()
+        turn = rj(ws)
         assert turn == {"type": "turn_complete"}
 
         # Verify fake client received client audio
@@ -262,7 +270,7 @@ def test_audio_relayed_both_directions(
         assert fake_live.current_session.sent_realtime_inputs[2]["activity_end"] is not None
 
         ws.send_json({"type": "end"})
-        ended = ws.receive_json()
+        ended = rj(ws)
         assert ended["type"] == "ended"
 
 
@@ -284,13 +292,13 @@ def test_audio_outside_speech_window_is_dropped(
                 "study_guide": sample_study_guide,
             }
         )
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # Send audio directly without speech_start
         ws.send_bytes(b"\x00\x02" * 100)
 
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
         assert fake_live.current_session is not None
         # Zero audio forwarded
@@ -311,7 +319,7 @@ def test_bad_first_message_closes_4400(voice_enabled_settings: Settings):
             "/api/v1/voice/session", headers={"origin": "http://localhost:5173"}
         ) as ws:
             ws.send_json({"type": "not_start"})
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "BAD_MESSAGE"
             ws.receive_text()
@@ -333,7 +341,7 @@ def test_start_timeout_closes_4408(
         ) as ws:
             import time
             time.sleep(0.2)
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "START_TIMEOUT"
             ws.receive_text()
@@ -351,22 +359,22 @@ def test_device_daily_cap_closes_4429(
     # First session
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-limit", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.send_json({"type": "end"})
-        assert ws.receive_json()["type"] == "ended"
+        assert rj(ws)["type"] == "ended"
 
     # Second session
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-limit", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.send_json({"type": "end"})
-        assert ws.receive_json()["type"] == "ended"
+        assert rj(ws)["type"] == "ended"
 
     # Third session should close with 4429 DEVICE_DAILY_LIMIT
     with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
             ws.send_json({"type": "start", "device_id": "dev-limit", "study_guide": sample_study_guide})
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "DEVICE_DAILY_LIMIT"
             ws.receive_text()
@@ -385,15 +393,15 @@ def test_global_daily_cap_closes_4429(
     # Session from device A
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-A", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
     # Session from device B hits global cap
     with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
             ws.send_json({"type": "start", "device_id": "dev-B", "study_guide": sample_study_guide})
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "GLOBAL_DAILY_LIMIT"
             ws.receive_text()
@@ -439,13 +447,13 @@ def test_max_duration_ends_session(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-timer", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # Wait for max duration watchdog to fire: input locks, then the
         # session ends at once because the coach is idle.
-        time_up = ws.receive_json()
+        time_up = rj(ws)
         assert time_up["type"] == "time_up"
-        ended = ws.receive_json()
+        ended = rj(ws)
         assert ended["type"] == "ended"
         assert ended["reason"] == "max_duration"
 
@@ -474,10 +482,10 @@ def test_time_up_waits_for_coach_to_finish_turn(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-grace", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         assert ws.receive_bytes() == b"\x00" * 480
 
-        time_up = ws.receive_json()
+        time_up = rj(ws)
         assert time_up["type"] == "time_up"
         assert time_up["grace_s"] == 10
 
@@ -488,8 +496,8 @@ def test_time_up_waits_for_coach_to_finish_turn(
         # The coach finishes its turn, and only then does the session end.
         assert fake_live.current_session is not None
         fake_live.current_session.incoming_queue.put_nowait(turn_complete_msg)
-        assert ws.receive_json()["type"] == "turn_complete"
-        ended = ws.receive_json()
+        assert rj(ws)["type"] == "turn_complete"
+        ended = rj(ws)
         assert ended["type"] == "ended"
         assert ended["reason"] == "max_duration"
 
@@ -519,109 +527,12 @@ def test_time_up_grace_deadline_ends_session(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-grace2", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.receive_bytes()
-        assert ws.receive_json()["type"] == "time_up"
-        ended = ws.receive_json()
+        assert rj(ws)["type"] == "time_up"
+        ended = rj(ws)
         assert ended["type"] == "ended"
         assert ended["reason"] == "max_duration"
-
-
-def test_next_question_nudge_after_answer_turn(
-    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
-):
-    """After feedback on an answer, the coach is prompted to continue after a pause."""
-    voice_enabled_settings.voice_next_question_pause_seconds = 0.05
-    tool_msg = types.LiveServerMessage(
-        tool_call=types.LiveServerToolCall(
-            function_calls=[
-                types.FunctionCall(
-                    id="call_rec_n",
-                    name="record_answer",
-                    args={
-                        "question": "Q1?",
-                        "student_answer": "A1",
-                        "correct": True,
-                        "feedback": "Right.",
-                    },
-                )
-            ]
-        )
-    )
-    turn_complete_msg = types.LiveServerMessage(
-        server_content=types.LiveServerContent(turn_complete=True)
-    )
-    fake_live = FakeLiveClient([tool_msg, turn_complete_msg])
-    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
-    app.dependency_overrides[get_live_client] = lambda: fake_live
-    client = TestClient(app)
-
-    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
-        ws.send_json({"type": "start", "device_id": "dev-nudge", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
-        assert ws.receive_json()["type"] == "answer_recorded"
-        assert ws.receive_json()["type"] == "turn_complete"
-
-        import time as _time
-
-        deadline = _time.monotonic() + 2.0
-        session = fake_live.current_session
-        assert session is not None
-        while _time.monotonic() < deadline and len(session.sent_inputs) < 2:
-            _time.sleep(0.02)
-        # First input is the kickoff prompt; second is the nudge.
-        assert len(session.sent_inputs) == 2
-        assert "next question" in session.sent_inputs[1]["input"]
-
-        ws.send_json({"type": "end"})
-        ws.receive_json()
-
-
-def test_nudge_cancelled_when_student_starts_speaking(
-    voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
-):
-    voice_enabled_settings.voice_next_question_pause_seconds = 0.3
-    tool_msg = types.LiveServerMessage(
-        tool_call=types.LiveServerToolCall(
-            function_calls=[
-                types.FunctionCall(
-                    id="call_rec_c",
-                    name="record_answer",
-                    args={
-                        "question": "Q1?",
-                        "student_answer": "A1",
-                        "correct": False,
-                        "feedback": "Not quite.",
-                    },
-                )
-            ]
-        )
-    )
-    turn_complete_msg = types.LiveServerMessage(
-        server_content=types.LiveServerContent(turn_complete=True)
-    )
-    fake_live = FakeLiveClient([tool_msg, turn_complete_msg])
-    app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
-    app.dependency_overrides[get_live_client] = lambda: fake_live
-    client = TestClient(app)
-
-    with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
-        ws.send_json({"type": "start", "device_id": "dev-nudge-cancel", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
-        assert ws.receive_json()["type"] == "answer_recorded"
-        assert ws.receive_json()["type"] == "turn_complete"
-
-        # Student starts answering during the pause.
-        ws.send_json({"type": "speech_start"})
-        import time as _time
-
-        _time.sleep(0.5)
-        session = fake_live.current_session
-        assert session is not None
-        assert len(session.sent_inputs) == 1  # kickoff only, no nudge
-
-        ws.send_json({"type": "end"})
-        ws.receive_json()
 
 
 def test_audio_quota_closes_4429(
@@ -637,12 +548,12 @@ def test_audio_quota_closes_4429(
     with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
             ws.send_json({"type": "start", "device_id": "dev-quota", "study_guide": sample_study_guide})
-            assert ws.receive_json()["type"] == "ready"
+            assert rj(ws)["type"] == "ready"
             ws.send_json({"type": "speech_start"})
             # Send 25000 bytes then 25000 bytes (total 50000 > 32000 quota)
             ws.send_bytes(b"\x01" * 25000)
             ws.send_bytes(b"\x01" * 25000)
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "AUDIO_QUOTA_EXCEEDED"
             ws.receive_text()
@@ -662,7 +573,7 @@ def test_guide_too_large_closes_4400(
     with pytest.raises(WebSocketDisconnect) as exc_info:
         with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
             ws.send_json({"type": "start", "device_id": "dev-large", "study_guide": sample_study_guide})
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "GUIDE_TOO_LARGE"
             ws.receive_text()
@@ -684,9 +595,9 @@ def test_status_remaining_decrements(
     # Complete 1 session
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "test-device", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.send_json({"type": "end"})
-        assert ws.receive_json()["type"] == "ended"
+        assert rj(ws)["type"] == "ended"
 
     # Remaining status is now 1
     r2 = client.get("/api/v1/voice/status", headers={"X-Device-ID": "test-device"})
@@ -705,9 +616,9 @@ def test_session_end_log_line(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-log", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.send_json({"type": "end"})
-        assert ws.receive_json()["type"] == "ended"
+        assert rj(ws)["type"] == "ended"
 
     captured = capsys.readouterr().out
     lines = [line for line in captured.strip().split("\n") if "voice_session_end" in line]
@@ -737,9 +648,9 @@ def test_tools_declared(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-tools", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
     assert fake_live.last_config is not None
     assert "tools" in fake_live.last_config
@@ -776,10 +687,10 @@ def test_record_answer_emits_frame_and_response(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-rec", "study_guide": sample_study_guide, "num_questions": 5})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # Client receives answer_recorded frame
-        frame = ws.receive_json()
+        frame = rj(ws)
         assert frame["type"] == "answer_recorded"
         assert frame["index"] == 1
         assert frame["question"] == "What is chlorophyll?"
@@ -796,7 +707,7 @@ def test_record_answer_emits_frame_and_response(
         assert resp.response == {"status": "ok", "recorded": 1, "remaining": 4}
 
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
 
 def test_record_answer_beyond_cap_ignored(
@@ -825,11 +736,11 @@ def test_record_answer_beyond_cap_ignored(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-cap", "study_guide": sample_study_guide, "num_questions": 3})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # 3 answer_recorded frames received
         for idx in range(1, 4):
-            f = ws.receive_json()
+            f = rj(ws)
             assert f["type"] == "answer_recorded"
             assert f["index"] == idx
 
@@ -841,7 +752,7 @@ def test_record_answer_beyond_cap_ignored(
         assert fourth_resp.response == {"status": "ignored", "reason": "quiz_full"}
 
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
 
 def test_invalid_tool_args_error_response(
@@ -867,7 +778,7 @@ def test_invalid_tool_args_error_response(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-bad-args", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # Check tool response on fake
         assert fake_live.current_session is not None
@@ -877,7 +788,7 @@ def test_invalid_tool_args_error_response(
         assert resp.response == {"status": "error", "reason": "invalid_arguments"}
 
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
 
 def test_end_quiz_summary_then_quiz_complete(
@@ -906,20 +817,20 @@ def test_end_quiz_summary_then_quiz_complete(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-eq", "study_guide": sample_study_guide, "num_questions": 5})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
         # Client receives quiz_summary frame
-        summary_frame = ws.receive_json()
+        summary_frame = rj(ws)
         assert summary_frame["type"] == "quiz_summary"
         assert "light reactions" in summary_frame["summary"]
         assert summary_frame["score"]["total"] == 5
 
         # Live turn_complete arrives
-        turn_msg = ws.receive_json()
+        turn_msg = rj(ws)
         assert turn_msg["type"] == "turn_complete"
 
         # Then server ends session with reason quiz_complete
-        ended = ws.receive_json()
+        ended = rj(ws)
         assert ended["type"] == "ended"
         assert ended["reason"] == "quiz_complete"
 
@@ -959,15 +870,15 @@ def test_end_quiz_fallback_timeout(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-fallback", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
+        assert rj(ws)["type"] == "ready"
 
-        summary = ws.receive_json()
+        summary = rj(ws)
         assert summary["type"] == "quiz_summary"
 
         # Rather than waiting 15s in test, wait or let max_duration or sleep fire;
         # Since fallback is 15s, let's test that if we send 'end' or after fallback it finishes.
         ws.send_json({"type": "end"})
-        ended = ws.receive_json()
+        ended = rj(ws)
         assert ended["type"] == "ended"
 
 
@@ -989,7 +900,7 @@ def test_num_questions_out_of_range_closes_4400(
                     "num_questions": 11,
                 }
             )
-            err = ws.receive_json()
+            err = rj(ws)
             assert err["type"] == "error"
             assert err["code"] == "INVALID_NUM_QUESTIONS"
             ws.receive_text()
@@ -1025,10 +936,10 @@ def test_session_end_log_line_has_quiz_counts(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-quiz-log", "study_guide": sample_study_guide})
-        assert ws.receive_json()["type"] == "ready"
-        ws.receive_json()  # answer_recorded frame
+        assert rj(ws)["type"] == "ready"
+        rj(ws)  # answer_recorded frame
         ws.send_json({"type": "end"})
-        assert ws.receive_json()["type"] == "ended"
+        assert rj(ws)["type"] == "ended"
 
     captured = capsys.readouterr().out
     lines = [line for line in captured.strip().split("\n") if "voice_session_end" in line]
@@ -1068,14 +979,14 @@ def test_record_answer_coerces_string_bool(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-coerce", "study_guide": sample_study_guide, "num_questions": 5})
-        assert ws.receive_json()["type"] == "ready"
-        first = ws.receive_json()
+        assert rj(ws)["type"] == "ready"
+        first = rj(ws)
         assert first["type"] == "answer_recorded" and first["correct"] is True
-        second = ws.receive_json()
+        second = rj(ws)
         assert second["type"] == "answer_recorded" and second["correct"] is False
         assert second["score"] == {"correct": 1, "total": 5}
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
 
 def test_end_quiz_rejected_once_when_answers_missing(
@@ -1093,8 +1004,8 @@ def test_end_quiz_rejected_once_when_answers_missing(
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
         ws.send_json({"type": "start", "device_id": "dev-missing", "study_guide": sample_study_guide, "num_questions": 5})
-        assert ws.receive_json()["type"] == "ready"
-        assert ws.receive_json()["type"] == "answer_recorded"
+        assert rj(ws)["type"] == "ready"
+        assert rj(ws)["type"] == "answer_recorded"
 
         import time as _time
 
@@ -1113,45 +1024,35 @@ def test_end_quiz_rejected_once_when_answers_missing(
         for i in range(2, 6):
             session.incoming_queue.put_nowait(_record_call(f"c{i}", f"Q{i}?", True))
         for _ in range(4):
-            assert ws.receive_json()["type"] == "answer_recorded"
+            assert rj(ws)["type"] == "answer_recorded"
         session.incoming_queue.put_nowait(end_msg)
-        summary = ws.receive_json()
+        summary = rj(ws)
         assert summary["type"] == "quiz_summary"
         assert summary["score"] == {"correct": 5, "asked": 5, "total": 5}
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)
 
 
-def test_nudge_skipped_when_tutor_already_asked_next_question(
+
+
+def test_pause_frame_follows_each_recorded_answer(
     voice_enabled_settings: Settings, sample_study_guide: dict[str, Any]
 ):
-    voice_enabled_settings.voice_next_question_pause_seconds = 0.05
-    asked_msg = types.LiveServerMessage(
-        server_content=types.LiveServerContent(
-            output_transcription=types.Transcription(text=" Question 2: what is the Calvin cycle?")
-        )
-    )
-    turn_complete_msg = types.LiveServerMessage(
-        server_content=types.LiveServerContent(turn_complete=True)
-    )
-    fake_live = FakeLiveClient([_record_call("c1", "Q1?", True), asked_msg, turn_complete_msg])
+    voice_enabled_settings.voice_next_question_pause_seconds = 1.5
+    fake_live = FakeLiveClient([_record_call("c1", "Q1?", True)])
     app.dependency_overrides[get_settings] = lambda: voice_enabled_settings
     app.dependency_overrides[get_live_client] = lambda: fake_live
     client = TestClient(app)
 
     with client.websocket_connect("/api/v1/voice/session", headers={"origin": "http://localhost:5173"}) as ws:
-        ws.send_json({"type": "start", "device_id": "dev-asked", "study_guide": sample_study_guide})
+        ws.send_json({"type": "start", "device_id": "dev-pause", "study_guide": sample_study_guide})
         assert ws.receive_json()["type"] == "ready"
         assert ws.receive_json()["type"] == "answer_recorded"
-        assert ws.receive_json()["type"] == "transcript"
-        assert ws.receive_json()["type"] == "turn_complete"
-
-        import time as _time
-
-        _time.sleep(0.4)
+        pause = ws.receive_json()
+        assert pause == {"type": "pause", "seconds": 1.5}
+        # No text prompt is sent to the Live session beyond the kickoff.
         session = fake_live.current_session
         assert session is not None
-        assert len(session.sent_inputs) == 1  # kickoff only; no nudge
-
+        assert len(session.sent_inputs) == 1
         ws.send_json({"type": "end"})
-        ws.receive_json()
+        rj(ws)

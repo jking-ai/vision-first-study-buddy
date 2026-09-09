@@ -281,6 +281,16 @@ export function useVoiceSession({ studyGuide, voice } = {}) {
         try {
           const msg = JSON.parse(event.data);
 
+          if (msg.type === "pause") {
+            // Pacing: leave a gap in playback before whatever the tutor says next.
+            const ctx = playbackContextRef.current;
+            if (ctx) {
+              const base = Math.max(ctx.currentTime, nextStartTimeRef.current);
+              nextStartTimeRef.current = base + (Number(msg.seconds) || 0);
+            }
+            return;
+          }
+
           if (msg.type === "interrupted") {
             activeSourcesRef.current.forEach((src) => {
               try {
