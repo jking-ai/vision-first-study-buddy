@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 
 PROMPT_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "voice_coach_template.txt"
 
+# Sent when the tutor finished a turn after a student answer without recording it.
+RECORD_REMINDER_PROMPT = (
+    "You did not record the student's last answer. Call record_answer for it now, "
+    "then continue the quiz from where you left off without repeating anything."
+)
+
 
 def _coerce_bool(value: Any) -> bool | None:
     """Accept the ways a model tends to spell a boolean."""
@@ -109,6 +115,8 @@ class VoiceSessionCoordinator:
         self.model_speaking = False  # audio received since the last turn_complete
         self.awaiting_response = False  # student finished speaking, coach hasn't completed a turn
         self.end_quiz_rejections = 0
+        self.record_pending = False  # student answered; no record_answer seen yet
+        self.record_reminders = 0
 
     async def _send_error_and_close(self, code: int, error_code: str, message: str) -> None:
         try:
@@ -344,6 +352,7 @@ class VoiceSessionCoordinator:
                         if self.in_speech:
                             self.in_speech = False
                             self.awaiting_response = True
+                            self.record_pending = True
                             await live_session.send_realtime_input(
                                 activity_end=types.ActivityEnd()
                             )
@@ -449,6 +458,23 @@ class VoiceSessionCoordinator:
                                         self.ended_reason = "max_duration"
                                         end_event.set()
                                         break
+                                    if self.record_pending:
+                                        # Verification: the student answered, the tutor
+                                        # finished its turn, and nothing was recorded.
+                                        self.record_pending = False
+                                        self.record_reminders += 1
+                                        logger.warning(
+                                            "voice tool: answer not recorded, reminding tutor session=%s reminders=%d",
+                                            self.session_id,
+                                            self.record_reminders,
+                                        )
+                                        try:
+                                            if hasattr(live_session, "send"):
+                                                await live_session.send(
+                                                    input=RECORD_REMINDER_PROMPT, end_of_turn=True
+                                                )
+                                        except Exception as e:
+                                            logger.warning("Failed to send record reminder: %s", e)
 
                                 if getattr(sc, "interrupted", False):
                                     await self.websocket.send_text(json.dumps({"type": "interrupted"}))
@@ -508,6 +534,7 @@ class VoiceSessionCoordinator:
                                                 "feedback": fb,
                                             }
                                             self.recorded_answers.append(rec)
+                                            self.record_pending = False
                                             logger.info(
                                                 "voice tool: record_answer ok session=%s index=%d correct=%s",
                                                 self.session_id,
