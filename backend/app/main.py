@@ -2,12 +2,17 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import get_settings
 from app.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import health, materials, quizzes, study_guides, upload, voice
+
+# App loggers emit at INFO so voice tool-call outcomes reach Cloud Run logs.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 def create_app() -> FastAPI:

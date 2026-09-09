@@ -776,6 +776,7 @@ Bidirectional WebSocket connection for Talking Tutor sessions: live oral quizzes
 | binary | raw PCM16 LE, 24 kHz, mono | Spoken audio chunks from coach. |
 | text | `{"type":"transcript","role":"user"\|"coach","text":"<string>"}` | Real-time transcription chunks. |
 | text | `{"type":"turn_complete"}` | Coach finished speaking a turn. |
+| text | `{"type":"pause","seconds":2.5}` | Sent right after `answer_recorded`. The client inserts this much silence in playback before the tutor's next audio, so the next question does not run straight into the feedback. |
 | text | `{"type":"time_up","grace_s":30}` | Session time limit reached. Client input is locked from here on; the coach may finish its current turn for up to `grace_s` seconds, then `ended` follows with reason `max_duration`. |
 | text | `{"type":"interrupted"}` | Coach turn interrupted by user. |
 | text | `{"type":"answer_recorded","index":<1-based>,"question":"<string>","student_answer":"<string>","correct":<bool>,"feedback":"<string>","score":{"correct":<int>,"total":<int>}}` | Answer recorded during oral quiz. |
@@ -796,11 +797,10 @@ Bidirectional WebSocket connection for Talking Tutor sessions: live oral quizzes
 | 4429 | `DEVICE_DAILY_LIMIT`, `GLOBAL_DAILY_LIMIT`, `CONCURRENT_LIMIT`, `AUDIO_QUOTA_EXCEEDED` | Session or rate cap hit. |
 | 4503 | `VOICE_DISABLED` | Feature flag `VOICE_ENABLED` is false. |
 
-**Pacing:** after the coach records an answer and finishes its feedback turn, the server waits `VOICE_NEXT_QUESTION_PAUSE_SECONDS` (default 2.5) and then prompts the coach to ask the next question. A `speech_start` during the pause cancels the prompt.
+**Pacing:** the tutor gives feedback and asks the next question in one turn. After each recorded answer the relay sends a `pause` frame with `VOICE_NEXT_QUESTION_PAUSE_SECONDS` (default 2.5); the client shifts its playback clock by that much, so the gap is deterministic and does not depend on the model ending its turn.
 
 **Live API Tool Declarations:**
 - `record_answer`: parameters `question` (str), `student_answer` (str), `correct` (bool), `feedback` (str). Arguments are coerced leniently (`correct` accepts `"true"`/`"false"` strings, missing `feedback` becomes empty) so a sloppy call still records the answer. Rejected only when `question` or `correct` is unusable.
 - `end_quiz`: parameters `summary` (str). If fewer than `num_questions` answers have been recorded, the first call is rejected with `{"status":"error","reason":"answers_missing","recorded":n,"expected":N,"message":...}` so the tutor records the missing answers; a second call is always accepted.
 
-The relay also skips the next-question prompt when the tutor's transcript after `record_answer` already contains a question, to avoid repeating one.
 

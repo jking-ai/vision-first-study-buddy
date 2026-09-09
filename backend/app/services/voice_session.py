@@ -26,13 +26,6 @@ logger = logging.getLogger(__name__)
 
 PROMPT_TEMPLATE_PATH = Path(__file__).parent.parent / "prompts" / "voice_coach_template.txt"
 
-# Sent to the coach after the pause that follows its feedback on an answer.
-NEXT_QUESTION_PROMPT = (
-    "Continue. If you have not yet spoken your feedback on the student's last answer, "
-    "say it now, starting with a clear verdict. Then ask the next question. "
-    "If you already asked it, repeat it briefly."
-)
-
 
 def _coerce_bool(value: Any) -> bool | None:
     """Accept the ways a model tends to spell a boolean."""
@@ -115,8 +108,6 @@ class VoiceSessionCoordinator:
         self.input_locked = False  # True once the time limit is reached
         self.model_speaking = False  # audio received since the last turn_complete
         self.awaiting_response = False  # student finished speaking, coach hasn't completed a turn
-        self.answer_recorded_this_turn = False
-        self.spoken_since_record = ""  # tutor transcript after the last record_answer in this turn
         self.end_quiz_rejections = 0
 
     async def _send_error_and_close(self, code: int, error_code: str, message: str) -> None:
@@ -310,27 +301,6 @@ class VoiceSessionCoordinator:
         end_event = asyncio.Event()
         quiz_complete_deadline: float | None = None
         grace_deadline: float | None = None
-        nudge_task: asyncio.Task[None] | None = None
-
-        async def nudge_next_question() -> None:
-            """After a pause, ask the coach to move on to the next question."""
-            try:
-                await asyncio.sleep(self.settings.voice_next_question_pause_seconds)
-            except asyncio.CancelledError:
-                return
-            if end_event.is_set() or self.input_locked or self.end_quiz_received:
-                return
-            try:
-                if hasattr(live_session, "send"):
-                    await live_session.send(input=NEXT_QUESTION_PROMPT, end_of_turn=True)
-            except Exception as e:
-                logger.warning("Failed to send next-question nudge: %s", e)
-
-        def cancel_nudge() -> None:
-            nonlocal nudge_task
-            if nudge_task is not None and not nudge_task.done():
-                nudge_task.cancel()
-            nudge_task = None
 
         async def client_to_live_task() -> None:
             while not end_event.is_set():
@@ -366,8 +336,6 @@ class VoiceSessionCoordinator:
                         if self.input_locked:
                             continue
                         if not self.in_speech:
-                            # The student is answering; do not interrupt with a nudge.
-                            cancel_nudge()
                             self.in_speech = True
                             await live_session.send_realtime_input(
                                 activity_start=types.ActivityStart()
@@ -413,7 +381,7 @@ class VoiceSessionCoordinator:
                     )
 
         async def live_to_client_task() -> None:
-            nonlocal quiz_complete_deadline, nudge_task
+            nonlocal quiz_complete_deadline
             try:
                 while not end_event.is_set():
                     has_messages = False
@@ -449,8 +417,6 @@ class VoiceSessionCoordinator:
                                     getattr(sc, "output_transcription", None)
                                     and sc.output_transcription.text
                                 ):
-                                    if self.answer_recorded_this_turn:
-                                        self.spoken_since_record += sc.output_transcription.text
                                     await self.websocket.send_text(
                                         json.dumps(
                                             {
@@ -483,18 +449,6 @@ class VoiceSessionCoordinator:
                                         self.ended_reason = "max_duration"
                                         end_event.set()
                                         break
-                                    if self.answer_recorded_this_turn:
-                                        self.answer_recorded_this_turn = False
-                                        already_asked = "?" in self.spoken_since_record
-                                        self.spoken_since_record = ""
-                                        cancel_nudge()
-                                        if already_asked:
-                                            logger.info(
-                                                "voice tool: skip nudge, tutor already asked the next question session=%s",
-                                                self.session_id,
-                                            )
-                                        else:
-                                            nudge_task = asyncio.create_task(nudge_next_question())
 
                                 if getattr(sc, "interrupted", False):
                                     await self.websocket.send_text(json.dumps({"type": "interrupted"}))
@@ -554,8 +508,6 @@ class VoiceSessionCoordinator:
                                                 "feedback": fb,
                                             }
                                             self.recorded_answers.append(rec)
-                                            self.answer_recorded_this_turn = True
-                                            self.spoken_since_record = ""
                                             logger.info(
                                                 "voice tool: record_answer ok session=%s index=%d correct=%s",
                                                 self.session_id,
@@ -576,6 +528,16 @@ class VoiceSessionCoordinator:
                                                             "correct": self.questions_correct,
                                                             "total": self.num_questions,
                                                         },
+                                                    }
+                                                )
+                                            )
+                                            # Pacing: the client inserts this much silence in
+                                            # playback between the feedback and the next question.
+                                            await self.websocket.send_text(
+                                                json.dumps(
+                                                    {
+                                                        "type": "pause",
+                                                        "seconds": self.settings.voice_next_question_pause_seconds,
                                                     }
                                                 )
                                             )
@@ -694,7 +656,6 @@ class VoiceSessionCoordinator:
                     # the turn it is in (or the reply it owes) within a grace
                     # window rather than cutting it off mid-sentence.
                     self.input_locked = True
-                    cancel_nudge()
                     grace_deadline = now + self.settings.voice_end_grace_seconds
                     if self.in_speech:
                         self.in_speech = False
@@ -750,7 +711,6 @@ class VoiceSessionCoordinator:
             return_when=asyncio.FIRST_COMPLETED,
         )
 
-        cancel_nudge()
         for task in pending:
             task.cancel()
             try:
