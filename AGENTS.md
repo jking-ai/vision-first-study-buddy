@@ -91,7 +91,7 @@ gcloud run deploy vision-first-study-buddy \
   --project <your-gcp-project> \
   --allow-unauthenticated \
   --timeout 300 \
-  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"],VOICE_ENABLED=true" \
+  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://study-buddy.jking.ai\",\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"],VOICE_ENABLED=true" \
   --set-secrets "GEMINI_LIVE_API_KEY=study-buddy-gemini-live-api-key:latest"
 
 # Frontend: build and deploy to Firebase Hosting

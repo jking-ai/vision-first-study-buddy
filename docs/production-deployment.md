@@ -11,7 +11,8 @@ How to deploy and operate the application on Google Cloud Platform.
 | GCP Project | `<your-gcp-project>` | All resources live in this project |
 | Backend API | Cloud Run | `vision-first-study-buddy` in `us-central1` |
 | Backend URL | Cloud Run | `https://<your-cloud-run-url>` |
-| Frontend | Firebase Hosting | `https://<your-firebase-site>.web.app` |
+| Frontend | Firebase Hosting | `https://study-buddy.jking.ai` (Firebase custom domain; proxied Cloudflare CNAME to the `.web.app` host) |
+| Frontend (default) | Firebase Hosting | `https://<your-firebase-site>.web.app` |
 | Frontend (alt) | Firebase Hosting | `https://<your-firebase-site>.firebaseapp.com` |
 | LLM | Vertex AI | Gemini 3.1 Pro Preview (`gemini-3.1-pro-preview`) |
 | File Storage | Firebase Storage | Bucket: `<your-storage-bucket>` |
@@ -28,7 +29,7 @@ How to deploy and operate the application on Google Cloud Platform.
 |----------|-------|
 | `GCP_PROJECT_ID` | `<your-gcp-project>` |
 | `FIREBASE_STORAGE_BUCKET` | `<your-storage-bucket>` |
-| `ALLOWED_ORIGINS` | `["https://<your-firebase-site>.web.app","https://<your-firebase-site>.firebaseapp.com"]` |
+| `ALLOWED_ORIGINS` | `["https://study-buddy.jking.ai","https://<your-firebase-site>.web.app","https://<your-firebase-site>.firebaseapp.com"]` |
 | `DOCS_ENABLED` | unset (defaults to `false` — leave it off in production) |
 
 > The default for `ALLOWED_ORIGINS` in code is an empty list. Production *must* set it explicitly to the prod web app origins, or the frontend will be CORS-blocked.
@@ -89,7 +90,7 @@ gcloud run deploy vision-first-study-buddy \
   --project <your-gcp-project> \
   --allow-unauthenticated \
   --timeout 300 \
-  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"],VOICE_ENABLED=true" \
+  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://study-buddy.jking.ai\",\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"],VOICE_ENABLED=true" \
   --set-secrets "GEMINI_LIVE_API_KEY=study-buddy-gemini-live-api-key:latest"
 
 # Verify deployment
@@ -128,7 +129,7 @@ gcloud run deploy vision-first-study-buddy \
   --region us-central1 \
   --project <your-gcp-project> \
   --allow-unauthenticated \
-  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"]"
+  --set-env-vars "GCP_PROJECT_ID=<your-gcp-project>,FIREBASE_STORAGE_BUCKET=<your-storage-bucket>,ALLOWED_ORIGINS=[\"https://study-buddy.jking.ai\",\"https://<your-firebase-site>.web.app\",\"https://<your-firebase-site>.firebaseapp.com\"]"
 
 # 2. Build frontend
 cd frontend
@@ -147,7 +148,7 @@ firebase deploy --only hosting:study-buddy --project <your-gcp-project>
 2. **Upload endpoint:** POST a test image to `/api/v1/materials/upload` with `X-Device-ID` header and verify it returns a material ID
 3. **Study guide generation:** POST to `/api/v1/study-guides/generate` with the uploaded material ID
 4. **Quiz generation:** POST to `/api/v1/quizzes/generate` and verify quiz questions are returned
-5. **Frontend:** `https://<your-firebase-site>.web.app` loads the React app
+5. **Frontend:** `https://study-buddy.jking.ai` loads the React app (the `.web.app` host still works)
 6. **End-to-end:** Upload a handwritten notes photo through the frontend, generate a study guide, and verify it displays
 
 ---
