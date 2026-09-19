@@ -36,6 +36,7 @@ docker run -p 8000:8000 \
 - `DOCS_ENABLED` — Set to `true` only in local dev to expose `/docs` and `/redoc`. Default `false` in production.
 - `VOICE_ENABLED` — Set to `true` to enable the Talking Tutor voice feature (default `false`).
 - `GEMINI_LIVE_API_KEY` — Google AI Studio Gemini API key for Gemini Live API (required when `VOICE_ENABLED=true`).
+- `GEMINI_MODEL` — Optional. Defaults to `gemini-3.1-pro-preview` in `app/config.py`; leave it unset unless you mean to override. A stale pin in `backend/.env` silently switches the model — check `GET /api/v1/health`, which reports the model in use.
 
 See `backend/.env.example` for all variables.
 
