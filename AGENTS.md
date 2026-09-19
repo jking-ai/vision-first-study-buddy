@@ -29,13 +29,14 @@ docker run -p 8000:8000 \
   vfsb-backend                     # Run container locally
 ```
 
-**Required environment variables** (set in `backend/.env` or your shell):
+**Environment variables** (set in `backend/.env` or your shell):
 - `GCP_PROJECT_ID` — GCP project ID (required; app fails to start without it)
 - `FIREBASE_STORAGE_BUCKET` — Firebase Storage bucket (required; app fails to start without it)
 - `ALLOWED_ORIGINS` — JSON list (or comma-separated) of permitted CORS origins. Default in code is empty (non-permissive); set this even for local dev.
 - `DOCS_ENABLED` — Set to `true` only in local dev to expose `/docs` and `/redoc`. Default `false` in production.
 - `VOICE_ENABLED` — Set to `true` to enable the Talking Tutor voice feature (default `false`).
 - `GEMINI_LIVE_API_KEY` — Google AI Studio Gemini API key for Gemini Live API (required when `VOICE_ENABLED=true`).
+- `GEMINI_MODEL` — Optional; leave unset to use the `app/config.py` default (see the note in `backend/.env.example`). `GET /api/v1/health` reports the model in use.
 
 See `backend/.env.example` for all variables.
 
@@ -133,9 +134,9 @@ firebase deploy --only hosting:study-buddy --project <your-gcp-project>
 cp backend/.env.example backend/.env
 # Required variables:
 #   GCP_PROJECT_ID=<your-gcp-project>
-#   GCP_REGION=us-central1 (default)
-#   GEMINI_MODEL=gemini-3.1-pro-preview (default)
 #   FIREBASE_STORAGE_BUCKET=<your-storage-bucket>
+# Everything else has a default in app/config.py; GEMINI_MODEL in particular
+# should stay unset unless you mean to override it.
 ```
 
 Backend requires GCP credentials for Vertex AI Gemini and Firebase Storage. For local development, configure application default credentials or a service account key. In production, Cloud Run's service account (with "Vertex AI User" and "Storage Object Admin" roles) provides implicit auth.
