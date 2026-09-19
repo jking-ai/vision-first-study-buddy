@@ -27,10 +27,9 @@ cd vision-first-study-buddy
 
 # Copy environment template
 cp backend/.env.example backend/.env
-# Fill in: GCP_PROJECT_ID, GCP_REGION, FIREBASE_STORAGE_BUCKET, ALLOWED_ORIGINS
-# Leave GEMINI_MODEL unset unless you mean to override the code default
-# (gemini-3.1-pro-preview). A pinned value in .env outlives changes to the
-# default and silently switches the model; /api/v1/health shows the one in use.
+# Fill in: GCP_PROJECT_ID, FIREBASE_STORAGE_BUCKET. Leave GEMINI_MODEL unset
+# unless you mean to override the app/config.py default (see the note in
+# .env.example); /api/v1/health shows the model in use.
 ```
 
 ### GCP Credentials
